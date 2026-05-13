@@ -1,10 +1,10 @@
 const drinkTypes = [
-  { id: "blue", name: "蓝月", icon: "🍸", base: 80, unlock: 1 },
-  { id: "orange", name: "橙光", icon: "🥃", base: 110, unlock: 1 },
-  { id: "purple", name: "紫夜", icon: "🍷", base: 150, unlock: 2 },
-  { id: "red", name: "红星", icon: "🍹", base: 210, unlock: 3 },
-  { id: "mint", name: "薄荷", icon: "🧉", base: 300, unlock: 4 },
-  { id: "gold", name: "金辉", icon: "🥂", base: 430, unlock: 5 },
+  { id: "blue", name: "蓝月", icon: "assets/drinks/blue.png", base: 80, unlock: 1 },
+  { id: "orange", name: "橙光", icon: "assets/drinks/orange.png", base: 110, unlock: 1 },
+  { id: "purple", name: "紫夜", icon: "assets/drinks/purple.png", base: 150, unlock: 2 },
+  { id: "red", name: "红星", icon: "assets/drinks/red.png", base: 210, unlock: 3 },
+  { id: "pink", name: "粉梦", icon: "assets/drinks/pink.png", base: 300, unlock: 4 },
+  { id: "gold", name: "金辉", icon: "assets/drinks/gold.png", base: 430, unlock: 5 },
 ];
 
 const ROWS = 4;
@@ -207,7 +207,7 @@ function renderLegend() {
     item.className = "legend-item";
     if (drink.unlock <= state.level) item.classList.add("unlocked");
     if (drink.unlock === state.lastUnlockedLevel && state.lastUnlockedLevel > 1) item.classList.add("just-unlocked");
-    item.innerHTML = `<span>${drink.icon}</span><span>${drink.name}</span><span>Lv.${drink.unlock}</span><span>${drink.base}</span>`;
+    item.innerHTML = `<img class="legend-icon" src="${drink.icon}" alt=""><span>${drink.name}</span><span>Lv.${drink.unlock}</span><span>${drink.base}</span>`;
     els.legend.appendChild(item);
   });
 }
@@ -221,7 +221,10 @@ function createTray(cups) {
     const cup = document.createElement("div");
     const drink = drinkTypes.find((item) => item.id === cups[i]);
     cup.className = `cup ${drink ? "" : "empty-cup"}`;
-    cup.textContent = drink ? drink.icon : "";
+    if (drink) {
+      cup.style.backgroundImage = `url("${drink.icon}")`;
+      cup.setAttribute("aria-label", drink.name);
+    }
     grid.appendChild(cup);
   }
   tray.appendChild(grid);
@@ -543,7 +546,7 @@ async function playMerge(action) {
   setMessage(`${drink.name}合并 x${action.amount}`);
   playCue("合并");
   for (let i = 0; i < action.amount; i += 1) {
-    flyCup(action.donorIndex, action.receiverIndex, drink.icon, i * 45);
+    flyCup(action.donorIndex, action.receiverIndex, drink, i * 45);
   }
   await wait(430 + action.amount * 45);
 }
@@ -751,13 +754,14 @@ function shakeSlot(index, message) {
   setMessage(message);
 }
 
-function flyCup(fromIndex, toIndex, icon, delay) {
+function flyCup(fromIndex, toIndex, drink, delay) {
   const from = centerOf(slotEl(fromIndex));
   const to = centerOf(slotEl(toIndex));
   if (!from || !to) return;
   const el = document.createElement("div");
   el.className = "fly-cup";
-  el.textContent = icon;
+  el.style.backgroundImage = `url("${drink.icon}")`;
+  el.setAttribute("aria-label", drink.name);
   el.style.left = `${from.x - 15}px`;
   el.style.top = `${from.y - 15}px`;
   els.effects.appendChild(el);

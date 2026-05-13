@@ -22,9 +22,10 @@ body {
   color: var(--text);
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
   background:
-    linear-gradient(rgba(25, 18, 28, 0.58), rgba(25, 18, 28, 0.88)),
-    url("游戏界面.jpg") center top / cover fixed,
+    linear-gradient(rgba(25, 18, 28, 0.2), rgba(25, 18, 28, 0.76)),
+    url("assets/bg/bar-backdrop.png") center top / cover fixed,
     var(--bg);
+  overflow-x: hidden;
 }
 
 button {
@@ -52,9 +53,9 @@ button:disabled {
 }
 
 .app {
-  width: min(1120px, calc(100vw - 24px));
+  width: min(1120px, calc(100vw - 20px));
   margin: 0 auto;
-  padding: 18px 0 28px;
+  padding: 12px 0 22px;
 }
 
 .top-panel,
@@ -91,19 +92,6 @@ h2 {
 
 h1 {
   font-size: clamp(28px, 4vw, 44px);
-}
-
-.version {
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 8px;
-  padding: 4px 8px;
-  border: 1px solid rgba(120, 230, 176, 0.45);
-  border-radius: 8px;
-  color: var(--green);
-  background: rgba(120, 230, 176, 0.1);
-  font-size: 14px;
-  font-weight: 800;
 }
 
 .stats {
@@ -179,22 +167,22 @@ h1 {
 
 .play-area {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+  gap: 12px;
   margin-top: 12px;
-  padding: 14px;
+  padding: 12px;
 }
 
 .board {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
 }
 
 .slot,
 .queue-slot {
   position: relative;
-  min-height: 118px;
+  min-height: 106px;
   border: 1px solid rgba(255, 232, 166, 0.35);
   border-radius: 8px;
   background: rgba(24, 16, 27, 0.58);
@@ -203,7 +191,9 @@ h1 {
 .slot {
   display: grid;
   place-items: center;
-  padding: 8px;
+  aspect-ratio: 1.42 / 1;
+  min-height: 0;
+  padding: clamp(4px, 0.8vw, 8px);
 }
 
 .slot.empty::before {
@@ -255,8 +245,8 @@ h1 {
 
 .tray {
   width: 100%;
-  min-height: 96px;
-  padding: 8px;
+  min-height: 88px;
+  padding: clamp(4px, 0.7vw, 8px);
   border: 2px solid rgba(255, 222, 142, 0.82);
   border-radius: 8px;
   background: linear-gradient(145deg, #f0cf94, #c89457);
@@ -312,17 +302,20 @@ h1 {
 .cups {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
+  gap: clamp(2px, 0.5vw, 5px);
 }
 
 .cup {
   display: grid;
   place-items: center;
-  min-height: 34px;
+  min-height: clamp(25px, 4vw, 34px);
   border-radius: 8px;
-  font-size: 24px;
+  font-size: 0;
   line-height: 1;
   background: rgba(255, 255, 255, 0.18);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .empty-cup {
@@ -395,7 +388,10 @@ h1 {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.82);
+  background-color: rgba(255, 255, 255, 0.82);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
   font-size: 21px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
   transition: transform 0.34s ease-in-out, opacity 0.34s ease-in-out;
@@ -419,6 +415,12 @@ h1 {
   background: rgba(255, 255, 255, 0.08);
   color: var(--muted);
   font-size: 13px;
+}
+
+.legend-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .overlay {
@@ -547,44 +549,182 @@ h1 {
 }
 
 @media (max-width: 840px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .app {
+    width: min(100vw - 10px, 560px);
+    padding-top: 6px;
+  }
+
   .top-panel,
-  .bar,
-  .play-area {
+  .bar {
     display: block;
+    margin-top: 6px;
+    padding: 8px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
   }
 
   .stats {
-    grid-template-columns: repeat(2, 1fr);
-    margin-top: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .stat {
+    padding: 6px;
+  }
+
+  .stat span {
+    font-size: 10px;
+  }
+
+  .stat strong {
+    font-size: 16px;
+  }
+
+  .host {
+    gap: 8px;
+  }
+
+  .portrait {
+    width: 42px;
+    height: 42px;
+  }
+
+  .bubble {
+    min-height: 36px;
+    padding: 8px 10px;
+    font-size: 13px;
   }
 
   .tools {
-    justify-content: flex-start;
-    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 8px;
+  }
+
+  button {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  .play-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 8px;
   }
 
   .queue {
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: none;
-    margin-top: 12px;
+    order: 2;
+    margin-top: 0;
+    gap: 6px;
   }
-}
 
-@media (max-width: 560px) {
   .board {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .queue {
-    grid-template-columns: 1fr;
+    order: 1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .slot,
   .queue-slot {
-    min-height: 104px;
+    min-height: 0;
   }
 
-  .bubble {
-    font-size: 14px;
+  .queue-slot {
+    min-height: 76px;
+  }
+
+  .tray {
+    min-height: 68px;
+    border-width: 1px;
+  }
+
+  .feedback,
+  .legend {
+    margin-top: 6px;
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .legend {
+    max-height: 76px;
+    overflow: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .app {
+    width: 100vw;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+
+  .top-panel {
+    display: none;
+  }
+
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin-top: 0;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .play-area {
+    min-height: calc(100svh - 158px);
+  }
+
+  .board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .slot {
+    aspect-ratio: 1.08 / 1;
+  }
+
+  .cups {
+    gap: 1px;
+  }
+
+  .cup {
+    min-height: clamp(18px, 6.2vw, 26px);
+  }
+
+  .queue {
+    position: sticky;
+    bottom: 0;
+    z-index: 9;
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(37, 24, 40, 0.92);
+    box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.22);
+  }
+
+  .queue-slot {
+    min-height: 68px;
+  }
+
+  .feedback {
+    display: none;
+  }
+
+  .floating-drag {
+    width: 118px;
   }
 }
