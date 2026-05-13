@@ -23,8 +23,10 @@ const levelThresholds = [0, 900, 2300, 4600, 7600, 11500, 16500, 23000, 31500, 4
 const SUPABASE_URL = "https://dkaabuxszrbnnrajnoaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_8UjZAjC-Ts2NiP8_NpmFdA_jv-CEzhd";
 const PROFILE_KEY = "starlight-cocktail-profile-v1";
+const SAVE_KEY = "starlight-cocktail-save-v1";
 const PLAYERS_TABLE = "starlight_players";
 const RESULTS_TABLE = "starlight_game_results";
+const REMOTE_SYNC_INTERVAL = 4200;
 
 const supabaseClient = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) || null;
 let leaderboardMode = "score";
@@ -56,6 +58,10 @@ const state = {
   audio: null,
   pointerDrag: null,
   resultSubmitted: false,
+  remoteResultId: null,
+  dirty: false,
+  saveTimer: null,
+  syncTimer: null,
 };
 
 const els = {
@@ -207,28 +213,121 @@ function closePanel(panel) {
   panel.classList.add("hidden");
 }
 
-async function submitGameResult() {
-  if (state.resultSubmitted || state.score <= 0) return;
+function serializableState() {
+  return {
+    board: state.board,
+    queue: state.queue,
+    score: state.score,
+    coin: state.coin,
+    energy: state.energy,
+    level: state.level,
+    lastUnlockedLevel: state.lastUnlockedLevel,
+    bestFullLevel: state.bestFullLevel,
+    combo: state.combo,
+    bestCombo: state.bestCombo,
+    fullCount: state.fullCount,
+    trash: state.trash,
+    tongs: state.tongs,
+    challengeCards: state.challengeCards,
+    bestScore: state.bestScore,
+    remoteResultId: state.remoteResultId,
+  };
+}
+
+function saveGameProgress() {
+  if (state.ended) return;
+  window.localStorage.setItem(SAVE_KEY, JSON.stringify(serializableState()));
+}
+
+function scheduleGameSave() {
+  state.dirty = true;
+  window.clearTimeout(state.saveTimer);
+  state.saveTimer = window.setTimeout(saveGameProgress, 160);
+}
+
+function loadGameProgress() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SAVE_KEY) || "null");
+    if (!saved?.board || !saved?.queue) return false;
+    state.board = saved.board;
+    state.queue = saved.queue;
+    state.score = saved.score || 0;
+    state.coin = saved.coin || 0;
+    state.energy = saved.energy ?? START_ENERGY;
+    state.level = saved.level || 1;
+    state.lastUnlockedLevel = saved.lastUnlockedLevel || state.level;
+    state.bestFullLevel = saved.bestFullLevel || 0;
+    state.combo = saved.combo || 0;
+    state.bestCombo = saved.bestCombo || 0;
+    state.fullCount = saved.fullCount || 0;
+    state.trash = saved.trash ?? 2;
+    state.tongs = saved.tongs ?? 2;
+    state.challengeCards = saved.challengeCards || 0;
+    state.bestScore = saved.bestScore || 0;
+    state.remoteResultId = saved.remoteResultId || null;
+    state.ended = false;
+    state.locked = false;
+    state.queueFresh = false;
+    state.resultSubmitted = false;
+    state.cue = "待机";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearGameProgress() {
+  window.localStorage.removeItem(SAVE_KEY);
+}
+
+async function syncGameSnapshot({ final = false } = {}) {
+  if (!supabaseClient || (!state.dirty && !final && state.remoteResultId)) return;
   const result = {
     score: state.score,
     bestFullLevel: state.bestFullLevel || 1,
     fullCount: state.fullCount,
     bestCombo: state.bestCombo,
   };
-  state.resultSubmitted = true;
-  if (!supabaseClient) return;
   const synced = profile.playerId ? true : await syncProfile();
   if (!synced || !profile.playerId) return;
   const bestDrink = drinkTypes[Math.max(0, result.bestFullLevel - 1)] || drinkTypes[0];
-  const { error } = await supabaseClient.from(RESULTS_TABLE).insert({
+  const payload = {
     player_id: profile.playerId,
     score: result.score,
     best_cup_level: result.bestFullLevel,
     best_cup_name: bestDrink.name,
     full_count: result.fullCount,
     best_combo: result.bestCombo,
-  });
+  };
+  const request = state.remoteResultId
+    ? supabaseClient.from(RESULTS_TABLE).update(payload).eq("id", state.remoteResultId).select("id").maybeSingle()
+    : supabaseClient.from(RESULTS_TABLE).insert(payload).select("id").single();
+  const { data, error } = await request;
   if (error) setNetworkStatus(`成绩提交失败：${error.message}`);
+  if (!error && state.remoteResultId && !data) {
+    state.remoteResultId = null;
+    state.dirty = true;
+    await syncGameSnapshot({ final });
+    return;
+  }
+  if (!error) {
+    if (data?.id) state.remoteResultId = data.id;
+    state.dirty = false;
+    saveGameProgress();
+  }
+}
+
+async function submitGameResult() {
+  if (state.resultSubmitted) return;
+  state.resultSubmitted = true;
+  await syncGameSnapshot({ final: true });
+}
+
+function startRealtimeSync() {
+  window.clearInterval(state.syncTimer);
+  state.syncTimer = window.setInterval(() => {
+    void syncGameSnapshot();
+  }, REMOTE_SYNC_INTERVAL);
 }
 
 function renderLeaderboardRows(rows) {
@@ -300,7 +399,35 @@ function openLeaderboardPanel() {
   void loadLeaderboard(leaderboardMode);
 }
 
-function startGame() {
+function scoreRating(score) {
+  if (score >= 12000) return "传奇调酒师";
+  if (score >= 6400) return "星冠调酒师";
+  if (score >= 3000) return "金牌调酒师";
+  if (score >= 900) return "进阶调酒师";
+  return "见习调酒师";
+}
+
+async function fetchScoreRank(score) {
+  if (!supabaseClient) return null;
+  const { count, error } = await supabaseClient
+    .from(RESULTS_TABLE)
+    .select("id", { count: "exact", head: true })
+    .gt("score", score);
+  if (error) return null;
+  return (count || 0) + 1;
+}
+
+function startGame({ restore = false } = {}) {
+  const restored = restore && loadGameProgress();
+  if (restored) {
+    els.overlay.classList.add("hidden");
+    cleanupPointerDrag();
+    setMessage("已恢复上次进度，继续调制吧。");
+    render();
+    startRealtimeSync();
+    return;
+  }
+  clearGameProgress();
   state.board = Array.from({ length: ROWS * COLS }, () => null);
   state.queue = [];
   state.drag = null;
@@ -323,12 +450,16 @@ function startGame() {
   state.locked = false;
   state.queueFresh = true;
   state.resultSubmitted = false;
+  state.remoteResultId = null;
+  state.dirty = true;
   state.cue = "待机";
   els.overlay.classList.add("hidden");
   cleanupPointerDrag();
   spawnQueue();
   setMessage("拖动吧台托盘到桌面空格，绿色格子表示会触发合并。");
   render();
+  scheduleGameSave();
+  startRealtimeSync();
 }
 
 function availableDrinks() {
@@ -676,6 +807,8 @@ async function placeQueueTray(queueIndex, boardIndex) {
   await animateSlot(boardIndex, "landed");
   await resolveBoard(boardIndex);
   await afterMove();
+  scheduleGameSave();
+  void syncGameSnapshot();
   unlockInput();
 }
 
@@ -697,6 +830,8 @@ async function moveBoardTray(fromIndex, toIndex) {
   await resolveBoard(toIndex);
   if (state.board[fromIndex]) await resolveBoard(fromIndex);
   await afterMove(false);
+  scheduleGameSave();
+  void syncGameSnapshot();
   unlockInput();
 }
 
@@ -724,6 +859,8 @@ async function useTrash(index) {
   playCue("垃圾桶");
   setMessage("已移除一个托盘。");
   await afterMove(false);
+  scheduleGameSave();
+  void syncGameSnapshot();
   unlockInput();
 }
 
@@ -742,6 +879,7 @@ async function resolveBoard(centerIndex) {
       changed = true;
       clearEmptyTrays();
       render();
+      await wait(160);
       await collectFullTrays();
     }
   }
@@ -805,9 +943,9 @@ async function playMerge(action) {
   setMessage(`${drink.name}合并 x${action.amount}`);
   playCue("合并");
   for (let i = 0; i < action.amount; i += 1) {
-    flyCup(action.donorIndex, action.receiverIndex, drink, i * 45);
+    flyCup(action.donorIndex, action.receiverIndex, drink, i * 90);
   }
-  await wait(430 + action.amount * 45);
+  await wait(620 + action.amount * 90);
 }
 
 function applyMerge(action) {
@@ -835,6 +973,7 @@ async function collectFullTrays() {
     state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(drink));
     setMessage(`${drink.name}满盘！接待完成，酣畅值 +${gained}。`);
     playCue(state.combo > 1 ? `连击 x${state.combo}` : "满盘");
+    state.dirty = true;
     render();
     burstAtSlot(index);
     floatTextAtSlot(index, `+${gained}`);
@@ -843,6 +982,8 @@ async function collectFullTrays() {
     collected = true;
     render();
     await checkLevelUp();
+    scheduleGameSave();
+    void syncGameSnapshot();
   }
   return collected;
 }
@@ -852,10 +993,8 @@ async function checkLevelUp() {
   if (nextLevel === state.level || state.score < levelThresholds[nextLevel - 1]) return;
   state.level = nextLevel;
   state.lastUnlockedLevel = nextLevel;
-  const removed = removeLowestDrink();
-  spawnQueue();
   playCue("升级");
-  setMessage(`解锁 Lv.${state.level} 美酒，低级酒转化为酣畅值 +${removed * 20}。`);
+  setMessage(`解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
   render();
   floatTextNearHeader(`解锁 Lv.${state.level}`);
   await wait(720);
@@ -1031,8 +1170,8 @@ function flyCup(fromIndex, toIndex, drink, delay) {
   el.className = "fly-cup";
   el.style.backgroundImage = `url("${drink.icon}")`;
   el.setAttribute("aria-label", drink.name);
-  el.style.left = `${from.x - 15}px`;
-  el.style.top = `${from.y - 15}px`;
+  el.style.left = `${from.x - 19}px`;
+  el.style.top = `${from.y - 19}px`;
   els.effects.appendChild(el);
   window.setTimeout(() => {
     el.style.transform = `translate(${to.x - from.x}px, ${to.y - from.y}px) scale(0.78)`;
@@ -1083,22 +1222,28 @@ function slotEl(index) {
   return els.board.querySelector(`[data-index="${index}"]`);
 }
 
-function endGame() {
+async function endGame() {
   state.ended = true;
   playCue("失败");
   render();
-  void submitGameResult();
-  els.modalTitle.textContent = "本局结束";
+  clearGameProgress();
+  els.modalTitle.textContent = "本局结算";
   els.modalText.innerHTML = [
+    ["本局评价", scoreRating(state.score)],
     ["最终酣畅值", state.score],
     ["特调币", state.coin],
     ["最高美酒等级", `Lv.${state.bestFullLevel || 1}`],
     ["满盘次数", state.fullCount],
     ["最佳连击", `x${state.bestCombo}`],
+    ["当前排名", "计算中..."],
   ]
-    .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
+    .map(([label, value]) => `<div><span>${label}</span><strong${label === "当前排名" ? ' id="finalRank"' : ""}>${value}</strong></div>`)
     .join("");
   els.overlay.classList.remove("hidden");
+  await submitGameResult();
+  const rank = await fetchScoreRank(state.score);
+  const rankEl = document.querySelector("#finalRank");
+  if (rankEl) rankEl.textContent = rank ? `第 ${rank} 名` : "暂未获取";
 }
 
 function restartGame() {
@@ -1174,4 +1319,4 @@ els.drinkDexPanel.addEventListener("click", (event) => {
 renderProfile();
 showLoginIfNeeded();
 if (profile.hasEntered) void syncProfile();
-startGame();
+startGame({ restore: true });

@@ -28,9 +28,13 @@ create table if not exists public.starlight_game_results (
   full_count integer not null default 0,
   best_combo integer not null default 0,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   constraint starlight_game_results_score_nonnegative check (score >= 0),
   constraint starlight_game_results_best_cup_range check (best_cup_level between 1 and 14)
 );
+
+alter table public.starlight_game_results
+  add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists starlight_game_results_score_rank_idx
   on public.starlight_game_results (score desc, best_cup_level desc, created_at desc);
@@ -51,6 +55,11 @@ $$;
 drop trigger if exists starlight_players_set_updated_at on public.starlight_players;
 create trigger starlight_players_set_updated_at
 before update on public.starlight_players
+for each row execute function public.set_updated_at();
+
+drop trigger if exists starlight_game_results_set_updated_at on public.starlight_game_results;
+create trigger starlight_game_results_set_updated_at
+before update on public.starlight_game_results
 for each row execute function public.set_updated_at();
 
 alter table public.starlight_players enable row level security;
@@ -80,4 +89,10 @@ using (true);
 drop policy if exists "public insert starlight game results" on public.starlight_game_results;
 create policy "public insert starlight game results"
 on public.starlight_game_results for insert
+with check (true);
+
+drop policy if exists "public update starlight game results" on public.starlight_game_results;
+create policy "public update starlight game results"
+on public.starlight_game_results for update
+using (true)
 with check (true);
