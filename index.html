@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>星光特调</title>
-    <link rel="stylesheet" href="styles.css?v=20260513-stuck-tools-v6">
+    <link rel="stylesheet" href="styles.css?v=20260513-rank-tabs-v7">
   </head>
   <body>
     <section class="login-screen" id="loginScreen">
@@ -156,8 +156,9 @@
           <button id="leaderboardClose" class="icon-command" type="button" aria-label="关闭">×</button>
         </div>
         <div class="rank-tabs">
-          <button id="scoreRankTab" class="active" type="button">单局积分</button>
+          <button id="scoreRankTab" class="active" type="button">最高分</button>
           <button id="cupRankTab" type="button">最高酒杯</button>
+          <button id="recentRankTab" type="button">最近成绩</button>
         </div>
         <div class="leaderboard-list" id="leaderboardList"></div>
         <p class="network-status" id="leaderboardStatus"></p>
@@ -165,6 +166,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="game.js?v=20260513-stuck-tools-v6"></script>
+    <script src="game.js?v=20260513-rank-tabs-v7"></script>
   </body>
 </html>

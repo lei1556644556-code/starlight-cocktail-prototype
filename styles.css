@@ -996,7 +996,7 @@ h1 {
 
 .rank-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1004,6 +1004,8 @@ h1 {
 .rank-tabs button {
   min-height: 38px;
   border-radius: 999px;
+  padding: 6px 8px;
+  font-size: 14px;
 }
 
 .rank-tabs button.active {

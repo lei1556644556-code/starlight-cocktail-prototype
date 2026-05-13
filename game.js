@@ -115,6 +115,7 @@ const els = {
   leaderboardClose: document.querySelector("#leaderboardClose"),
   scoreRankTab: document.querySelector("#scoreRankTab"),
   cupRankTab: document.querySelector("#cupRankTab"),
+  recentRankTab: document.querySelector("#recentRankTab"),
   leaderboardList: document.querySelector("#leaderboardList"),
   leaderboardStatus: document.querySelector("#leaderboardStatus"),
 };
@@ -233,6 +234,32 @@ function syncTimeLabel() {
 
 function setLeaderboardStatus(text) {
   if (els.leaderboardStatus) els.leaderboardStatus.textContent = text;
+}
+
+function playerNameOf(row) {
+  return row.player?.display_name || row.starlight_players?.display_name || row.players?.display_name || "游客";
+}
+
+function dedupeBestRows(rows, mode) {
+  const bestByPlayer = new Map();
+  rows.forEach((row) => {
+    const key = row.player_id || playerNameOf(row);
+    const current = bestByPlayer.get(key);
+    if (!current) {
+      bestByPlayer.set(key, row);
+      return;
+    }
+    const better = mode === "cup"
+      ? row.best_cup_level > current.best_cup_level || (row.best_cup_level === current.best_cup_level && row.score > current.score)
+      : row.score > current.score || (row.score === current.score && row.best_cup_level > current.best_cup_level);
+    if (better) bestByPlayer.set(key, row);
+  });
+  return Array.from(bestByPlayer.values())
+    .sort((a, b) => {
+      if (mode === "cup") return b.best_cup_level - a.best_cup_level || b.score - a.score;
+      return b.score - a.score || b.best_cup_level - a.best_cup_level;
+    })
+    .slice(0, 20);
 }
 
 function openProfilePanel() {
@@ -419,9 +446,14 @@ function renderLeaderboardRows(rows) {
   }
   els.leaderboardList.innerHTML = rows
     .map((row, index) => {
-      const player = row.player?.display_name || row.starlight_players?.display_name || row.players?.display_name || "游客";
-      const main = leaderboardMode === "score" ? row.score : `Lv.${row.best_cup_level} ${row.best_cup_name}`;
-      const sub = leaderboardMode === "score" ? `最高酒杯 Lv.${row.best_cup_level}` : `单局积分 ${row.score}`;
+      const player = playerNameOf(row);
+      const main = leaderboardMode === "cup" ? `Lv.${row.best_cup_level} ${row.best_cup_name}` : row.score;
+      const subMap = {
+        score: `最高酒杯 Lv.${row.best_cup_level}`,
+        cup: `最高分 ${row.score}`,
+        recent: `${new Date(row.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })} · 最高酒杯 Lv.${row.best_cup_level}`,
+      };
+      const sub = subMap[leaderboardMode] || "";
       return `<div class="rank-row">
         <strong>${index + 1}</strong>
         <span>${player}</span>
@@ -436,6 +468,7 @@ async function loadLeaderboard(mode = leaderboardMode, { silent = false } = {}) 
   leaderboardMode = mode;
   els.scoreRankTab.classList.toggle("active", mode === "score");
   els.cupRankTab.classList.toggle("active", mode === "cup");
+  els.recentRankTab.classList.toggle("active", mode === "recent");
   if (!silent) els.leaderboardList.innerHTML = `<div class="empty-rank">加载中...</div>`;
   if (!supabaseClient) {
     setLeaderboardStatus("Supabase SDK 未加载，排行榜暂不可用。");
@@ -444,26 +477,34 @@ async function loadLeaderboard(mode = leaderboardMode, { silent = false } = {}) 
   }
   let query = supabaseClient
     .from(RESULTS_TABLE)
-    .select("score,best_cup_level,best_cup_name,created_at,player:starlight_players(display_name)")
-    .limit(20);
-  query = mode === "score"
-    ? query.order("score", { ascending: false }).order("best_cup_level", { ascending: false })
-    : query.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+    .select("player_id,score,best_cup_level,best_cup_name,created_at,player:starlight_players(display_name)")
+    .limit(mode === "recent" ? 20 : 200);
+  if (mode === "recent") {
+    query = query.order("created_at", { ascending: false });
+  } else if (mode === "cup") {
+    query = query.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+  } else {
+    query = query.order("score", { ascending: false }).order("best_cup_level", { ascending: false });
+  }
   let { data, error } = await query;
   if (error && error.message?.includes("display_name")) {
     let fallbackQuery = supabaseClient
       .from(RESULTS_TABLE)
-      .select("score,best_cup_level,best_cup_name,created_at")
-      .limit(20);
-    fallbackQuery = mode === "score"
-      ? fallbackQuery.order("score", { ascending: false }).order("best_cup_level", { ascending: false })
-      : fallbackQuery.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+      .select("player_id,score,best_cup_level,best_cup_name,created_at")
+      .limit(mode === "recent" ? 20 : 200);
+    if (mode === "recent") {
+      fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
+    } else if (mode === "cup") {
+      fallbackQuery = fallbackQuery.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+    } else {
+      fallbackQuery = fallbackQuery.order("score", { ascending: false }).order("best_cup_level", { ascending: false });
+    }
     const fallback = await fallbackQuery;
     data = fallback.data;
     error = fallback.error;
     if (!error) {
       setLeaderboardStatus(`排行榜已刷新 ${syncTimeLabel()}；数据库缺少昵称字段，当前先显示游客名。`);
-      renderLeaderboardRows(data);
+      renderLeaderboardRows(mode === "recent" ? data : dedupeBestRows(data, mode));
       return;
     }
   }
@@ -472,8 +513,13 @@ async function loadLeaderboard(mode = leaderboardMode, { silent = false } = {}) 
     renderLeaderboardRows([]);
     return;
   }
-  setLeaderboardStatus(mode === "score" ? `按单局酣畅值排序，已刷新 ${syncTimeLabel()}。` : `按最高酒杯等级排序，已刷新 ${syncTimeLabel()}。`);
-  renderLeaderboardRows(data);
+  const statusMap = {
+    score: `每名玩家仅显示历史最高分，已刷新 ${syncTimeLabel()}。`,
+    cup: `每名玩家仅显示历史最高酒杯，已刷新 ${syncTimeLabel()}。`,
+    recent: `显示最近 20 局成绩，已刷新 ${syncTimeLabel()}。`,
+  };
+  setLeaderboardStatus(statusMap[mode]);
+  renderLeaderboardRows(mode === "recent" ? data : dedupeBestRows(data, mode));
 }
 
 function openLeaderboardPanel() {
@@ -504,12 +550,28 @@ function scoreRating(score) {
 
 async function fetchScoreRank(score) {
   if (!supabaseClient) return null;
-  const { count, error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from(RESULTS_TABLE)
-    .select("id", { count: "exact", head: true })
-    .gt("score", score);
+    .select("player_id,score,best_cup_level")
+    .order("score", { ascending: false })
+    .order("best_cup_level", { ascending: false })
+    .limit(200);
   if (error) return null;
-  return (count || 0) + 1;
+  const rows = dedupeBestRows(data, "score");
+  return rows.filter((row) => row.score > score).length + 1;
+}
+
+async function fetchPlayerBestScore() {
+  if (!supabaseClient || !profile.playerId) return null;
+  const { data, error } = await supabaseClient
+    .from(RESULTS_TABLE)
+    .select("score,best_cup_level")
+    .eq("player_id", profile.playerId)
+    .order("score", { ascending: false })
+    .order("best_cup_level", { ascending: false })
+    .limit(1);
+  if (error) return null;
+  return data?.[0]?.score ?? null;
 }
 
 function startGame({ restore = false } = {}) {
@@ -1374,19 +1436,28 @@ async function endGame() {
   els.modalText.innerHTML = [
     ["本局评价", scoreRating(state.score)],
     ["最终酣畅值", state.score],
+    ["历史最高分", "计算中..."],
+    ["纪录状态", "计算中..."],
     ["特调币", state.coin],
     ["最高美酒等级", `Lv.${state.bestFullLevel || 1}`],
     ["满盘次数", state.fullCount],
     ["最佳连击", `x${state.bestCombo}`],
     ["当前排名", "计算中..."],
   ]
-    .map(([label, value]) => `<div><span>${label}</span><strong${label === "当前排名" ? ' id="finalRank"' : ""}>${value}</strong></div>`)
+    .map(([label, value]) => {
+      const idMap = { 当前排名: "finalRank", 历史最高分: "finalBestScore", 纪录状态: "finalRecordState" };
+      return `<div><span>${label}</span><strong${idMap[label] ? ` id="${idMap[label]}"` : ""}>${value}</strong></div>`;
+    })
     .join("");
   els.overlay.classList.remove("hidden");
   await submitGameResult();
-  const rank = await fetchScoreRank(state.score);
+  const [rank, bestScore] = await Promise.all([fetchScoreRank(state.score), fetchPlayerBestScore()]);
   const rankEl = document.querySelector("#finalRank");
   if (rankEl) rankEl.textContent = rank ? `第 ${rank} 名` : "暂未获取";
+  const bestEl = document.querySelector("#finalBestScore");
+  if (bestEl) bestEl.textContent = bestScore ?? "暂未获取";
+  const recordEl = document.querySelector("#finalRecordState");
+  if (recordEl) recordEl.textContent = bestScore !== null && state.score >= bestScore ? "刷新纪录" : "未破纪录";
 }
 
 function restartGame() {
@@ -1435,6 +1506,7 @@ els.leaderboardPanel.addEventListener("click", (event) => {
 });
 els.scoreRankTab.addEventListener("click", () => loadLeaderboard("score"));
 els.cupRankTab.addEventListener("click", () => loadLeaderboard("cup"));
+els.recentRankTab.addEventListener("click", () => loadLeaderboard("recent"));
 
 els.trashBtn.addEventListener("click", () => {
   if (state.trash <= 0 || state.ended || state.locked) return;
