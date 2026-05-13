@@ -27,6 +27,32 @@ const SAVE_KEY = "starlight-cocktail-save-v1";
 const PLAYERS_TABLE = "starlight_players";
 const RESULTS_TABLE = "starlight_game_results";
 const REMOTE_SYNC_INTERVAL = 4200;
+const AUDIO_ROOT = "assets/audio";
+
+const sfxMap = {
+  "拿起托盘": "pickup.wav",
+  "夹起托盘": "pickup.wav",
+  放置: "place.wav",
+  合并: "merge.wav",
+  满盘: "full-tray.wav",
+  升级: "level-up.wav",
+  失败: "game-over.wav",
+  垃圾桶: "trash.wav",
+  夹子: "tongs.wav",
+  刷新托盘: "refresh.wav",
+  无效操作: "invalid.wav",
+};
+
+const voiceMap = {
+  start: "start.wav",
+  restore: "restore.wav",
+  useTool: "use-tool.wav",
+  invalid: "invalid.wav",
+  fullTray: "full-tray.wav",
+  levelUp: "level-up.wav",
+  gameOver: "game-over.wav",
+  record: "record.wav",
+};
 
 const supabaseClient = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) || null;
 let leaderboardMode = "score";
@@ -58,6 +84,8 @@ const state = {
   queueFresh: false,
   cue: "待机",
   audio: null,
+  bgm: null,
+  audioUnlocked: false,
   pointerDrag: null,
   resultSubmitted: false,
   remoteResultId: null,
@@ -226,6 +254,32 @@ async function syncProfile() {
 function setNetworkStatus(text) {
   if (els.loginStatus) els.loginStatus.textContent = text;
   if (els.profileStatus) els.profileStatus.textContent = text;
+}
+
+function initAudio() {
+  if (state.audioUnlocked) return;
+  state.audioUnlocked = true;
+  state.bgm ||= new Audio(`${AUDIO_ROOT}/music/lounge-loop.wav`);
+  state.bgm.loop = true;
+  state.bgm.volume = 0.28;
+  state.bgm.play().catch(() => {});
+}
+
+function playAudioFile(src, volume = 0.72) {
+  if (!state.audioUnlocked) return;
+  const audio = new Audio(src);
+  audio.volume = volume;
+  audio.play().catch(() => {});
+}
+
+function playSfx(name) {
+  const file = name.endsWith?.(".wav") ? name : sfxMap[name] || (name.startsWith("连击") ? "full-tray.wav" : null);
+  if (file) playAudioFile(`${AUDIO_ROOT}/sfx/${file}`, 0.68);
+}
+
+function playNpcVoice(key) {
+  const file = voiceMap[key];
+  if (file) playAudioFile(`${AUDIO_ROOT}/voice/${file}`, 0.88);
 }
 
 function syncTimeLabel() {
@@ -431,6 +485,7 @@ function promptToolChoice() {
   state.needsToolChoice = true;
   setMessage("桌面已经没有可放托盘的位置了。请使用垃圾桶/夹子救局，或者点“不用道具”直接结算。");
   playCue("无效操作");
+  playNpcVoice("useTool");
   render();
   scheduleGameSave();
 }
@@ -580,6 +635,7 @@ function startGame({ restore = false } = {}) {
     els.overlay.classList.add("hidden");
     cleanupPointerDrag();
     setMessage("已恢复上次进度，继续调制吧。");
+    playNpcVoice("restore");
     render();
     startRealtimeSync();
     return;
@@ -615,6 +671,7 @@ function startGame({ restore = false } = {}) {
   cleanupPointerDrag();
   spawnQueue();
   setMessage("拖动吧台托盘到桌面空格，绿色格子表示会触发合并。");
+  playNpcVoice("start");
   render();
   scheduleGameSave();
   startRealtimeSync();
@@ -1152,6 +1209,7 @@ async function collectFullTrays() {
     state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(drink));
     setMessage(`${drink.name}满盘！接待完成，酣畅值 +${gained}。`);
     playCue(state.combo > 1 ? `连击 x${state.combo}` : "满盘");
+    playNpcVoice("fullTray");
     markProgressChanged();
     render();
     burstAtSlot(index);
@@ -1174,6 +1232,7 @@ async function checkLevelUp() {
   state.lastUnlockedLevel = nextLevel;
   playCue("升级");
   setMessage(`解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
+  playNpcVoice("levelUp");
   render();
   floatTextNearHeader(`解锁 Lv.${state.level}`);
   await wait(720);
@@ -1274,6 +1333,7 @@ function setMessage(text) {
 
 function playCue(name) {
   state.cue = name;
+  playSfx(name);
   playTone(name);
   renderStats();
   window.clearTimeout(playCue.timer);
@@ -1342,6 +1402,7 @@ function shakeSlot(index, message) {
   slot?.classList.add("shake");
   window.setTimeout(() => slot?.classList.remove("shake"), 320);
   setMessage(message);
+  playNpcVoice("invalid");
 }
 
 function flyCup(action, drink, moveIndex, delay) {
@@ -1430,6 +1491,7 @@ function slotEl(index) {
 async function endGame() {
   state.ended = true;
   playCue("失败");
+  playNpcVoice("gameOver");
   render();
   clearGameProgress();
   els.modalTitle.textContent = "本局结算";
@@ -1457,7 +1519,9 @@ async function endGame() {
   const bestEl = document.querySelector("#finalBestScore");
   if (bestEl) bestEl.textContent = bestScore ?? "暂未获取";
   const recordEl = document.querySelector("#finalRecordState");
-  if (recordEl) recordEl.textContent = bestScore !== null && state.score >= bestScore ? "刷新纪录" : "未破纪录";
+  const isRecord = bestScore !== null && state.score >= bestScore;
+  if (recordEl) recordEl.textContent = isRecord ? "刷新纪录" : "未破纪录";
+  if (isRecord) playNpcVoice("record");
 }
 
 function restartGame() {
@@ -1466,6 +1530,8 @@ function restartGame() {
 }
 
 els.guestLoginBtn.addEventListener("click", async () => {
+  initAudio();
+  playSfx("ui-click.wav");
   const name = els.loginNameInput.value.trim();
   if (name) profile.displayName = name.slice(0, 16);
   profile.hasEntered = true;
@@ -1482,6 +1548,8 @@ els.guestLoginBtn.addEventListener("click", async () => {
 });
 
 els.loginHelpBtn.addEventListener("click", () => {
+  initAudio();
+  playSfx("ui-click.wav");
   els.loginStatus.textContent = "直接游客进入即可开玩；昵称和手机号之后都能在头像按钮里改。";
 });
 
@@ -1540,6 +1608,10 @@ els.drinkDexClose.addEventListener("click", () => {
 });
 els.drinkDexPanel.addEventListener("click", (event) => {
   if (event.target === els.drinkDexPanel) els.drinkDexPanel.classList.add("hidden");
+});
+window.addEventListener("pointerdown", initAudio, { once: true });
+window.addEventListener("click", (event) => {
+  if (event.target.closest?.("button")) playSfx("ui-click.wav");
 });
 window.addEventListener("beforeunload", flushGameProgress);
 document.addEventListener("visibilitychange", () => {
