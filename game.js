@@ -679,6 +679,7 @@ function createTray(cups) {
       image.className = "cup-img";
       image.src = drink.icon;
       image.alt = "";
+      cup.dataset.drinkId = drink.id;
       cup.appendChild(image);
       cup.setAttribute("aria-label", drink.name);
     }
@@ -1012,10 +1013,12 @@ async function playMerge(action) {
   flashSlots([action.receiverIndex, action.donorIndex]);
   setMessage(`${drink.name}合并 x${action.amount}`);
   playCue("合并");
+  const flights = [];
   for (let i = 0; i < action.amount; i += 1) {
-    flyCup(action.donorIndex, action.receiverIndex, drink, i * 90);
+    flights.push(flyCup(action, drink, i, i * 100));
   }
-  await wait(620 + action.amount * 90);
+  await Promise.all(flights);
+  await wait(120);
 }
 
 function applyMerge(action) {
@@ -1232,10 +1235,11 @@ function shakeSlot(index, message) {
   setMessage(message);
 }
 
-function flyCup(fromIndex, toIndex, drink, delay) {
-  const from = centerOf(slotEl(fromIndex));
-  const to = centerOf(slotEl(toIndex));
-  if (!from || !to) return;
+function flyCup(action, drink, moveIndex, delay) {
+  const from = cupCenterOf(action.donorIndex, drink.id, moveIndex) || centerOf(slotEl(action.donorIndex));
+  const receiverFillCount = state.board[action.receiverIndex]?.length || 0;
+  const to = cupSlotCenterOf(action.receiverIndex, receiverFillCount + moveIndex + 1) || centerOf(slotEl(action.receiverIndex));
+  if (!from || !to) return Promise.resolve();
   const el = document.createElement("div");
   el.className = "fly-cup";
   el.style.backgroundImage = `url("${drink.icon}")`;
@@ -1243,11 +1247,33 @@ function flyCup(fromIndex, toIndex, drink, delay) {
   el.style.left = `${from.x - 19}px`;
   el.style.top = `${from.y - 19}px`;
   els.effects.appendChild(el);
-  window.setTimeout(() => {
-    el.style.transform = `translate(${to.x - from.x}px, ${to.y - from.y}px) scale(0.78)`;
-    el.style.opacity = "0.15";
-  }, delay);
-  window.setTimeout(() => el.remove(), delay + 430);
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      requestAnimationFrame(() => {
+        el.getBoundingClientRect();
+        requestAnimationFrame(() => {
+          el.classList.add("moving");
+          el.style.transform = `translate(${to.x - from.x}px, ${to.y - from.y}px) scale(0.78)`;
+          el.style.opacity = "0.15";
+        });
+      });
+    }, delay);
+    window.setTimeout(() => {
+      el.remove();
+      resolve();
+    }, delay + 560);
+  });
+}
+
+function cupCenterOf(slotIndex, drinkId, occurrence = 0) {
+  const slot = slotEl(slotIndex);
+  const cups = Array.from(slot?.querySelectorAll(`.cup[data-drink-id="${drinkId}"]`) || []);
+  return centerOf(cups[occurrence] || cups[cups.length - 1]);
+}
+
+function cupSlotCenterOf(slotIndex, position) {
+  const slot = slotEl(slotIndex);
+  return centerOf(slot?.querySelector(`.cup[data-position="${position}"]`));
 }
 
 function burstAtSlot(index) {
