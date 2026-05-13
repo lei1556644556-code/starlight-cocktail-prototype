@@ -53,7 +53,7 @@ button:disabled {
 }
 
 .app {
-  width: min(1280px, calc(100vw - 18px));
+  width: min(780px, calc(100vw - 18px));
   margin: 0 auto;
   padding: 12px 0 22px;
 }
@@ -71,6 +71,9 @@ button:disabled {
 }
 
 .game-shell {
+  min-height: calc(100svh - 24px);
+  display: grid;
+  grid-template-rows: auto minmax(170px, 22svh) auto minmax(0, 1fr) auto;
   overflow: hidden;
   border-color: rgba(255, 216, 121, 0.36);
   background:
@@ -86,7 +89,7 @@ button:disabled {
   gap: 18px;
   border-width: 0 0 1px;
   border-radius: 0;
-  padding: 12px 16px;
+  padding: 8px 10px;
   background: linear-gradient(180deg, rgba(52, 37, 56, 0.95), rgba(31, 22, 37, 0.8));
 }
 
@@ -110,7 +113,7 @@ h2 {
 h1 {
   color: #fff8e8;
   text-shadow: 0 3px 0 rgba(52, 37, 63, 0.9), 0 0 16px rgba(255, 216, 121, 0.25);
-  font-size: clamp(28px, 4vw, 48px);
+  font-size: clamp(24px, 2.8vw, 30px);
 }
 
 .currency-strip {
@@ -121,8 +124,8 @@ h1 {
 
 .hud-pill,
 .icon-command {
-  min-width: 90px;
-  min-height: 42px;
+  min-width: 68px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -136,17 +139,17 @@ h1 {
 .hud-icon {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 23px;
+  height: 23px;
   border-radius: 50%;
   background: radial-gradient(circle, #fff4b0, #d59845);
 }
 
 .icon-command {
-  min-width: 42px;
+  min-width: 34px;
   padding: 0;
   color: #fff5c9;
-  font-size: 24px;
+  font-size: 19px;
 }
 
 .stats {
@@ -177,12 +180,12 @@ h1 {
 
 .stage {
   position: relative;
-  min-height: 318px;
+  min-height: 210px;
   display: grid;
-  grid-template-columns: minmax(250px, 31%) minmax(360px, 1fr) minmax(225px, 23%);
-  gap: 14px;
+  grid-template-columns: 170px minmax(0, 1fr) 150px;
+  gap: 9px;
   margin: 0;
-  padding: 18px 18px 12px;
+  padding: 8px 10px 8px;
   border-width: 0 0 1px;
   border-radius: 0;
   background:
@@ -193,15 +196,15 @@ h1 {
 .hostess-wrap {
   position: relative;
   align-self: end;
-  height: 290px;
+  height: 200px;
   overflow: visible;
 }
 
 .hostess {
   position: absolute;
-  left: -36px;
-  bottom: -38px;
-  width: min(365px, 39vw);
+  left: -30px;
+  bottom: -22px;
+  width: 236px;
   max-width: none;
   filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.45));
 }
@@ -209,14 +212,14 @@ h1 {
 .speech-card {
   align-self: center;
   display: grid;
-  gap: 14px;
+  gap: 8px;
 }
 
 .bubble {
   position: relative;
-  max-width: 620px;
-  min-height: 68px;
-  padding: 16px 20px;
+  max-width: 100%;
+  min-height: 56px;
+  padding: 11px 16px 10px;
   border: 2px solid rgba(174, 126, 76, 0.7);
   border-radius: 8px;
   color: #4a3940;
@@ -225,16 +228,17 @@ h1 {
     linear-gradient(180deg, #fffdf4, #f7ead7);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
   font-weight: 800;
-  font-size: clamp(16px, 2vw, 24px);
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .bubble::before {
   content: "";
   position: absolute;
-  left: -18px;
-  bottom: 18px;
-  width: 28px;
-  height: 28px;
+  left: -12px;
+  bottom: 17px;
+  width: 20px;
+  height: 20px;
   background: #f8eddb;
   border-left: 2px solid rgba(174, 126, 76, 0.7);
   border-bottom: 2px solid rgba(174, 126, 76, 0.7);
@@ -253,20 +257,20 @@ h1 {
 }
 
 .progress-card {
-  padding: 12px 14px;
+  padding: 9px 12px;
 }
 
 .progress-top {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 8px;
-  font-size: 18px;
+  margin-bottom: 6px;
+  font-size: 14px;
   font-weight: 900;
 }
 
 .progress-bar {
-  height: 18px;
+  height: 13px;
   overflow: hidden;
   border: 2px solid rgba(255, 235, 172, 0.46);
   border-radius: 999px;
@@ -285,18 +289,19 @@ h1 {
 
 .level-badge {
   width: fit-content;
-  margin-top: 8px;
-  padding: 4px 10px;
+  margin-top: 6px;
+  padding: 3px 8px;
   border-radius: 999px;
   color: #fff4c3;
   background: rgba(255, 216, 121, 0.12);
   font-weight: 900;
+  font-size: 13px;
 }
 
 .side-cards {
   align-self: center;
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .reward-card,
@@ -305,28 +310,29 @@ h1 {
     url("assets/ui/panel-tall.png") center / 100% 100% no-repeat,
     linear-gradient(180deg, rgba(41, 31, 45, 0.88), rgba(78, 48, 76, 0.9));
   display: grid;
-  gap: 6px;
-  padding: 16px;
+  gap: 4px;
+  padding: 10px 8px;
   text-align: center;
 }
 
 .reward-card span,
 .best-card span {
   color: #e7d6d9;
+  font-size: 12px;
 }
 
 .reward-card strong,
 .best-card strong {
   color: var(--gold);
-  font-size: 24px;
+  font-size: 18px;
 }
 
 .tool-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 7px 10px;
   border-width: 0 0 1px;
   border-radius: 0;
   background: rgba(47, 29, 50, 0.95);
@@ -341,12 +347,12 @@ h1 {
 
 .tool-button {
   position: relative;
-  min-width: 116px;
+  min-width: 104px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 7px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
   background:
     url("assets/ui/button-gem.png") center / 100% 100% no-repeat,
@@ -356,8 +362,8 @@ h1 {
 .tool-icon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   color: #59382d;
   background: linear-gradient(180deg, #fff8d7, #d99e4f);
@@ -366,9 +372,9 @@ h1 {
 .play-area {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 9px;
   margin-top: 0;
-  padding: 16px 18px;
+  padding: 10px;
   border-width: 0;
   border-radius: 0;
   background:
@@ -379,13 +385,13 @@ h1 {
 .board {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(6px, 1vw, 10px);
+  gap: 6px;
 }
 
 .slot,
 .queue-slot {
   position: relative;
-  min-height: 104px;
+  min-height: 0;
   border: 0;
   border-radius: 8px;
   background: rgba(55, 34, 55, 0.72);
@@ -394,9 +400,8 @@ h1 {
 .slot {
   display: grid;
   place-items: center;
-  aspect-ratio: 1.36 / 1;
-  min-height: 0;
-  padding: clamp(4px, 0.8vw, 8px);
+  aspect-ratio: 1.55 / 1;
+  padding: 5px;
 }
 
 .slot::before,
@@ -406,6 +411,13 @@ h1 {
   inset: 8px;
   border-radius: 8px;
   background: rgba(42, 27, 44, 0.62);
+}
+
+.queue-slot {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  min-height: 88px;
 }
 
 .slot.empty::after {
@@ -452,8 +464,8 @@ h1 {
 .queue {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 16px 18px 18px;
+  gap: 8px;
+  padding: 8px 10px 11px;
   border-top: 1px solid rgba(255, 216, 121, 0.22);
   background: linear-gradient(180deg, rgba(60, 38, 56, 0.92), rgba(39, 25, 42, 0.96));
 }
@@ -462,8 +474,8 @@ h1 {
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: 76px;
-  padding: 5px 9px 2px;
+  min-height: 66px;
+  padding: 4px 7px 2px;
   border: 2px solid rgba(171, 117, 72, 0.88);
   border-radius: 8px;
   background:
@@ -481,6 +493,8 @@ h1 {
 }
 
 .queue .tray {
+  width: min(160px, 72%);
+  justify-self: center;
   cursor: grab;
   transition: transform 0.18s ease, opacity 0.18s ease, filter 0.18s ease;
 }
@@ -519,7 +533,7 @@ h1 {
   pointer-events: none;
   position: fixed;
   z-index: 40;
-  width: 168px;
+  width: 154px;
   opacity: 0.92;
   transform: translate(-50%, -50%) scale(0.96);
 }
@@ -529,22 +543,29 @@ h1 {
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 0;
-  min-height: clamp(72px, 6.4vw, 92px);
+  min-height: 62px;
   overflow: visible;
 }
 
 .cup {
+  position: relative;
   display: grid;
   place-items: center;
-  min-height: clamp(42px, 5.4vw, 64px);
+  min-height: 31px;
   border-radius: 8px;
   font-size: 0;
   line-height: 1;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 178% auto;
-  transform: translateY(-13px) scale(1.16);
   filter: drop-shadow(0 4px 3px rgba(65, 33, 36, 0.28));
+}
+
+.cup-img {
+  width: clamp(48px, 7.1vw, 64px);
+  max-width: none;
+  height: auto;
+  object-fit: contain;
+  transform: translateY(-14px) scale(1.12);
+  pointer-events: none;
+  user-select: none;
 }
 
 .empty-cup {
@@ -941,7 +962,7 @@ h1 {
   }
 
   .slot {
-    aspect-ratio: 1.08 / 1;
+    aspect-ratio: 1.42 / 1;
     padding: 4px;
   }
 
@@ -957,7 +978,7 @@ h1 {
   }
 
   .queue-slot {
-    min-height: 70px;
+    min-height: 64px;
   }
 
   .tray {
@@ -971,9 +992,12 @@ h1 {
   }
 
   .cup {
-    min-height: clamp(27px, 7vw, 40px);
-    background-size: 182% auto;
-    transform: translateY(-9px) scale(1.18);
+    min-height: 29px;
+  }
+
+  .cup-img {
+    width: clamp(40px, 11vw, 54px);
+    transform: translateY(-10px) scale(1.1);
   }
 
   .legend {
@@ -985,6 +1009,10 @@ h1 {
 }
 
 @media (max-width: 560px) {
+  .game-shell {
+    grid-template-rows: auto minmax(140px, 20svh) auto minmax(0, 1fr) auto;
+  }
+
   .app {
     width: 100vw;
     padding-left: 5px;
@@ -998,11 +1026,12 @@ h1 {
   }
 
   .brand-lockup {
-    max-width: 122px;
+    max-width: none;
   }
 
   h1 {
-    font-size: 20px;
+    font-size: 19px;
+    white-space: nowrap;
   }
 
   .eyebrow {
@@ -1021,17 +1050,17 @@ h1 {
 
   .stage {
     grid-template-columns: 92px minmax(0, 1fr);
-    min-height: 150px;
+    min-height: 140px;
   }
 
   .hostess-wrap {
-    height: 142px;
+    height: 132px;
   }
 
   .hostess {
     left: -46px;
-    bottom: -18px;
-    width: 180px;
+    bottom: -16px;
+    width: 168px;
   }
 
   .side-cards {
@@ -1040,7 +1069,7 @@ h1 {
 
   .tool-bar {
     position: sticky;
-    top: 54px;
+    top: 56px;
     z-index: 9;
   }
 
@@ -1049,7 +1078,7 @@ h1 {
   }
 
   .play-area {
-    min-height: calc(100svh - 308px);
+    min-height: calc(100svh - 280px);
   }
 
   .board {
@@ -1058,7 +1087,7 @@ h1 {
   }
 
   .slot {
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 1.28 / 1;
     padding: 3px;
   }
 
@@ -1076,9 +1105,12 @@ h1 {
   }
 
   .cup {
-    min-height: clamp(22px, 7.2vw, 32px);
-    background-size: 190% auto;
-    transform: translateY(-8px) scale(1.2);
+    min-height: 24px;
+  }
+
+  .cup-img {
+    width: clamp(34px, 13vw, 46px);
+    transform: translateY(-9px) scale(1.08);
   }
 
   .queue {
@@ -1093,6 +1125,10 @@ h1 {
 
   .queue-slot {
     min-height: 58px;
+  }
+
+  .queue .tray {
+    width: 72%;
   }
 
   .floating-drag {
