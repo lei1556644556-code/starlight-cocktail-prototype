@@ -19,6 +19,22 @@ create table if not exists public.starlight_players (
   constraint starlight_players_phone_len check (phone is null or char_length(phone) between 6 and 20)
 );
 
+with duplicate_names as (
+  select
+    id,
+    display_name,
+    row_number() over (partition by lower(display_name) order by created_at, id) as duplicate_rank
+  from public.starlight_players
+)
+update public.starlight_players as players
+set display_name = left(duplicate_names.display_name, 11) || '#' || left(replace(players.id::text, '-', ''), 4)
+from duplicate_names
+where players.id = duplicate_names.id
+  and duplicate_names.duplicate_rank > 1;
+
+create unique index if not exists starlight_players_display_name_lower_unique
+  on public.starlight_players (lower(display_name));
+
 create table if not exists public.starlight_game_results (
   id bigint generated always as identity primary key,
   player_id uuid not null references public.starlight_players(id) on delete cascade,

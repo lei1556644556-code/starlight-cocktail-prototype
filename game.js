@@ -161,6 +161,21 @@ function renderProfile() {
   els.profilePhoneInput.value = profile.phone || "";
 }
 
+async function isDisplayNameAvailable(name) {
+  if (!supabaseClient) {
+    return { ok: false, message: "当前网络组件未加载，暂时不能校验昵称是否重复。" };
+  }
+  const { data, error } = await supabaseClient
+    .from(PLAYERS_TABLE)
+    .select("id, guest_key")
+    .ilike("display_name", name)
+    .neq("guest_key", profile.guestKey)
+    .limit(1);
+  if (error) return { ok: false, message: `昵称校验失败：${error.message}` };
+  if (data?.length) return { ok: false, message: "这个昵称已经被使用了，请换一个。" };
+  return { ok: true, message: "" };
+}
+
 function showLoginIfNeeded() {
   if (profile.hasEntered) {
     els.loginScreen.classList.add("hidden");
@@ -176,6 +191,11 @@ async function syncProfile() {
     setNetworkStatus("离线本地模式：Supabase SDK 未加载，玩法不受影响。");
     return false;
   }
+  const nameCheck = await isDisplayNameAvailable(profile.displayName);
+  if (!nameCheck.ok) {
+    setNetworkStatus(nameCheck.message);
+    return false;
+  }
   const record = {
     guest_key: profile.guestKey,
     display_name: profile.displayName,
@@ -187,7 +207,8 @@ async function syncProfile() {
     .select("id, display_name, phone")
     .single();
   if (error) {
-    setNetworkStatus(`同步失败：${error.message}`);
+    const duplicateName = error.code === "23505" || error.message?.includes("display_name");
+    setNetworkStatus(duplicateName ? "这个昵称已经被使用了，请换一个。" : `同步失败：${error.message}`);
     return false;
   }
   profile.playerId = data.id;
@@ -1306,9 +1327,14 @@ els.guestLoginBtn.addEventListener("click", async () => {
   profile.hasEntered = true;
   saveLocalProfile();
   renderProfile();
+  els.loginStatus.textContent = "正在校验昵称...";
+  const synced = await syncProfile();
+  if (!synced) {
+    profile.hasEntered = false;
+    saveLocalProfile();
+    return;
+  }
   els.loginScreen.classList.add("hidden");
-  els.loginStatus.textContent = "正在同步游客资料...";
-  await syncProfile();
 });
 
 els.loginHelpBtn.addEventListener("click", () => {
@@ -1325,7 +1351,7 @@ els.saveProfileBtn.addEventListener("click", async () => {
   profile.displayName = name ? name.slice(0, 16) : makeGuestName();
   profile.phone = els.profilePhoneInput.value.trim();
   profile.hasEntered = true;
-  els.profileStatus.textContent = "保存中...";
+  els.profileStatus.textContent = "正在校验昵称...";
   await syncProfile();
 });
 
