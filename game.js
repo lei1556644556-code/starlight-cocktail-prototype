@@ -50,6 +50,7 @@ const state = {
   fullCount: 0,
   trash: 2,
   tongs: 2,
+  needsToolChoice: false,
   challengeCards: 0,
   bestScore: 0,
   ended: false,
@@ -89,6 +90,7 @@ const els = {
   message: document.querySelector("#message"),
   trashBtn: document.querySelector("#trashBtn"),
   tongsBtn: document.querySelector("#tongsBtn"),
+  endRunBtn: document.querySelector("#endRunBtn"),
   trashCount: document.querySelector("#trashCount"),
   tongsCount: document.querySelector("#tongsCount"),
   scoreFill: document.querySelector("#scoreFill"),
@@ -259,6 +261,7 @@ function serializableState() {
     fullCount: state.fullCount,
     trash: state.trash,
     tongs: state.tongs,
+    needsToolChoice: state.needsToolChoice,
     challengeCards: state.challengeCards,
     bestScore: state.bestScore,
     remoteResultId: state.remoteResultId,
@@ -298,6 +301,7 @@ function loadGameProgress() {
     state.fullCount = saved.fullCount || 0;
     state.trash = saved.trash ?? 2;
     state.tongs = saved.tongs ?? 2;
+    state.needsToolChoice = Boolean(saved.needsToolChoice);
     state.challengeCards = saved.challengeCards || 0;
     state.bestScore = saved.bestScore || 0;
     state.remoteResultId = saved.remoteResultId || null;
@@ -382,6 +386,30 @@ function startRealtimeSync() {
   state.syncTimer = window.setInterval(() => {
     void syncGameSnapshot();
   }, REMOTE_SYNC_INTERVAL);
+}
+
+function hasPlacementMove() {
+  return state.queue.some(Boolean) && state.board.some((tray) => !tray);
+}
+
+function hasRecoveryTool() {
+  return state.trash > 0 || state.tongs > 0;
+}
+
+function isToolChoiceNeeded() {
+  return !state.ended && !hasPlacementMove() && hasRecoveryTool();
+}
+
+function promptToolChoice() {
+  state.needsToolChoice = true;
+  setMessage("桌面已经没有可放托盘的位置了。请使用垃圾桶/夹子救局，或者点“不用道具”直接结算。");
+  playCue("无效操作");
+  render();
+  scheduleGameSave();
+}
+
+function clearToolChoiceIfRecovered() {
+  if (hasPlacementMove() || !hasRecoveryTool()) state.needsToolChoice = false;
 }
 
 function renderLeaderboardRows(rows) {
@@ -511,6 +539,7 @@ function startGame({ restore = false } = {}) {
   state.fullCount = 0;
   state.trash = 2;
   state.tongs = 2;
+  state.needsToolChoice = false;
   state.challengeCards = 0;
   state.bestScore = Math.max(state.bestScore, state.score);
   state.ended = false;
@@ -583,6 +612,7 @@ function renderStats() {
   els.tongsBtn.classList.toggle("active", state.tool === "tongs");
   els.trashBtn.disabled = state.trash <= 0 || state.ended || state.locked;
   els.tongsBtn.disabled = state.tongs <= 0 || state.ended || state.locked;
+  els.endRunBtn.classList.toggle("hidden", !state.needsToolChoice || state.ended || state.locked);
 }
 
 function renderBoard() {
@@ -691,12 +721,20 @@ function createTray(cups) {
 
 function onQueuePointerDown(event, index) {
   if (state.locked || state.ended || state.tool === "trash" || !state.queue[index]) return;
+  if (state.needsToolChoice || isToolChoiceNeeded()) {
+    promptToolChoice();
+    return;
+  }
   beginPointerDrag(event, { type: "queue", index }, state.queue[index]);
   setMessage("拖到桌面空格；绿色格子会产生合并。");
   playCue("拿起托盘");
 }
 
 function onBoardPointerDown(event, index) {
+  if (state.needsToolChoice && state.tool !== "tongs") {
+    promptToolChoice();
+    return;
+  }
   if (state.locked || state.ended || state.tool !== "tongs" || !state.board[index]) {
     if (state.tool === "tongs") shakeSlot(index, "夹子模式下才能拖动桌面托盘。");
     return;
@@ -893,6 +931,7 @@ async function moveBoardTray(fromIndex, toIndex) {
   state.board[toIndex] = movingTray;
   state.tongs -= 1;
   state.tool = null;
+  state.needsToolChoice = false;
   markProgressChanged();
   playCue("夹子");
   render();
@@ -908,6 +947,10 @@ async function moveBoardTray(fromIndex, toIndex) {
 function onBoardClick(index) {
   if (state.ended || state.locked) return;
   if (state.tool !== "trash") {
+    if (state.needsToolChoice || isToolChoiceNeeded()) {
+      promptToolChoice();
+      return;
+    }
     shakeSlot(index, "请拖动托盘进行放置。");
     playCue("无效操作");
     return;
@@ -926,6 +969,7 @@ async function useTrash(index) {
   state.board[index] = null;
   state.trash -= 1;
   state.tool = null;
+  state.needsToolChoice = false;
   markProgressChanged();
   playCue("垃圾桶");
   setMessage("已移除一个托盘。");
@@ -1106,7 +1150,12 @@ async function afterMove(shouldSpawn = true) {
     render();
     await wait(380);
   }
-  if (!hasLegalMove()) {
+  clearToolChoiceIfRecovered();
+  if (!hasPlacementMove()) {
+    if (hasRecoveryTool()) {
+      promptToolChoice();
+      return;
+    }
     endGame();
     return;
   }
@@ -1114,9 +1163,7 @@ async function afterMove(shouldSpawn = true) {
 }
 
 function hasLegalMove() {
-  const hasQueueTray = state.queue.some(Boolean);
-  const hasEmptySlot = state.board.some((tray) => !tray);
-  return (hasQueueTray && hasEmptySlot) || state.trash > 0 || state.tongs > 0;
+  return hasPlacementMove() || hasRecoveryTool();
 }
 
 function willMergeAt(index, tray) {
@@ -1403,6 +1450,12 @@ els.tongsBtn.addEventListener("click", () => {
   state.drag = null;
   setMessage(state.tool ? "夹子已启用，拖动桌面托盘来移动或交换。" : "已取消夹子。");
   render();
+});
+
+els.endRunBtn.addEventListener("click", () => {
+  if (!state.needsToolChoice || state.ended || state.locked) return;
+  state.needsToolChoice = false;
+  void endGame();
 });
 
 els.newGameBtn.addEventListener("click", restartGame);
