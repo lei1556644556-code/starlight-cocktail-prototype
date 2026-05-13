@@ -1,17 +1,25 @@
 const drinkTypes = [
-  { id: "blue", name: "蓝月", icon: "assets/drinks/blue.png", base: 80, unlock: 1 },
-  { id: "orange", name: "橙光", icon: "assets/drinks/orange.png", base: 110, unlock: 1 },
-  { id: "purple", name: "紫夜", icon: "assets/drinks/purple.png", base: 150, unlock: 2 },
-  { id: "red", name: "红星", icon: "assets/drinks/red.png", base: 210, unlock: 3 },
-  { id: "pink", name: "粉梦", icon: "assets/drinks/pink.png", base: 300, unlock: 4 },
-  { id: "gold", name: "金辉", icon: "assets/drinks/gold.png", base: 430, unlock: 5 },
+  { id: "level01", name: "蓝星", icon: "assets/drinks/level-01.png", base: 80, unlock: 1 },
+  { id: "level02", name: "橙光", icon: "assets/drinks/level-02.png", base: 110, unlock: 1 },
+  { id: "level03", name: "紫莓", icon: "assets/drinks/level-03.png", base: 150, unlock: 2 },
+  { id: "level04", name: "红樱", icon: "assets/drinks/level-04.png", base: 210, unlock: 3 },
+  { id: "level05", name: "粉梦", icon: "assets/drinks/level-05.png", base: 300, unlock: 4 },
+  { id: "level06", name: "金调", icon: "assets/drinks/level-06.png", base: 430, unlock: 5 },
+  { id: "level07", name: "薄荷", icon: "assets/drinks/level-07.png", base: 610, unlock: 6 },
+  { id: "level08", name: "蝶影", icon: "assets/drinks/level-08.png", base: 860, unlock: 7 },
+  { id: "level09", name: "翠晶", icon: "assets/drinks/level-09.png", base: 1200, unlock: 8 },
+  { id: "level10", name: "玫瑰", icon: "assets/drinks/level-10.png", base: 1680, unlock: 9 },
+  { id: "level11", name: "银月", icon: "assets/drinks/level-11.png", base: 2350, unlock: 10 },
+  { id: "level12", name: "午夜", icon: "assets/drinks/level-12.png", base: 3300, unlock: 11 },
+  { id: "level13", name: "虹光", icon: "assets/drinks/level-13.png", base: 4600, unlock: 12 },
+  { id: "level14", name: "星冠", icon: "assets/drinks/level-14.png", base: 6400, unlock: 13 },
 ];
 
 const ROWS = 4;
 const COLS = 4;
 const TRAY_CAPACITY = 6;
 const START_ENERGY = 50;
-const levelThresholds = [0, 900, 2300, 4600, 7600];
+const levelThresholds = [0, 900, 2300, 4600, 7600, 11500, 16500, 23000, 31500, 42500, 57000, 76000, 101000, 134000];
 
 const state = {
   board: [],
@@ -30,6 +38,8 @@ const state = {
   fullCount: 0,
   trash: 2,
   tongs: 2,
+  challengeCards: 0,
+  bestScore: 0,
   ended: false,
   locked: false,
   queueFresh: false,
@@ -51,6 +61,10 @@ const els = {
   tongsBtn: document.querySelector("#tongsBtn"),
   trashCount: document.querySelector("#trashCount"),
   tongsCount: document.querySelector("#tongsCount"),
+  scoreFill: document.querySelector("#scoreFill"),
+  scoreTarget: document.querySelector("#scoreTarget"),
+  challengeCount: document.querySelector("#challengeCount"),
+  bestScore: document.querySelector("#bestScore"),
   combo: document.querySelector("#combo"),
   soundCue: document.querySelector("#soundCue"),
   newGameBtn: document.querySelector("#newGameBtn"),
@@ -78,6 +92,8 @@ function startGame() {
   state.fullCount = 0;
   state.trash = 2;
   state.tongs = 2;
+  state.challengeCards = 0;
+  state.bestScore = Math.max(state.bestScore, state.score);
   state.ended = false;
   state.locked = false;
   state.queueFresh = true;
@@ -125,6 +141,14 @@ function renderStats() {
   els.coin.textContent = state.coin;
   els.energy.textContent = state.energy;
   els.level.textContent = state.level;
+  const target = levelThresholds[Math.min(state.level, levelThresholds.length - 1)] || levelThresholds[levelThresholds.length - 1];
+  const previousTarget = levelThresholds[Math.max(0, state.level - 1)] || 0;
+  const progress = target > previousTarget ? (state.score - previousTarget) / (target - previousTarget) : 1;
+  els.scoreTarget.textContent = target;
+  els.scoreFill.style.width = `${Math.max(0, Math.min(1, progress)) * 100}%`;
+  els.challengeCount.textContent = state.challengeCards;
+  state.bestScore = Math.max(state.bestScore, state.score);
+  els.bestScore.textContent = state.bestScore;
   els.trashCount.textContent = state.trash;
   els.tongsCount.textContent = state.tongs;
   els.combo.textContent = `连击 x${state.combo}`;
@@ -207,7 +231,7 @@ function renderLegend() {
     item.className = "legend-item";
     if (drink.unlock <= state.level) item.classList.add("unlocked");
     if (drink.unlock === state.lastUnlockedLevel && state.lastUnlockedLevel > 1) item.classList.add("just-unlocked");
-    item.innerHTML = `<img class="legend-icon" src="${drink.icon}" alt=""><span>${drink.name}</span><span>Lv.${drink.unlock}</span><span>${drink.base}</span>`;
+    item.innerHTML = `<img class="legend-icon" src="${drink.icon}" alt=""><span>${drink.name}</span><span>Lv.${drinkLevel(drink)}</span><span>${drink.base}</span>`;
     els.legend.appendChild(item);
   });
 }
@@ -222,7 +246,11 @@ function createTray(cups) {
     const drink = drinkTypes.find((item) => item.id === cups[i]);
     cup.className = `cup ${drink ? "" : "empty-cup"}`;
     if (drink) {
-      cup.style.backgroundImage = `url("${drink.icon}")`;
+      const image = document.createElement("img");
+      image.className = "cup-img";
+      image.src = drink.icon;
+      image.alt = "";
+      cup.appendChild(image);
       cup.setAttribute("aria-label", drink.name);
     }
     grid.appendChild(cup);
@@ -572,7 +600,8 @@ async function collectFullTrays() {
     state.fullCount += 1;
     state.score += gained;
     state.coin += Math.ceil(gained / 10);
-    state.bestFullLevel = Math.max(state.bestFullLevel, drink.unlock);
+    state.challengeCards += Math.max(1, drinkLevel(drink));
+    state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(drink));
     setMessage(`${drink.name}满盘！接待完成，酣畅值 +${gained}。`);
     playCue(state.combo > 1 ? `连击 x${state.combo}` : "满盘");
     render();
@@ -588,8 +617,8 @@ async function collectFullTrays() {
 }
 
 async function checkLevelUp() {
-  const nextLevel = Math.min(levelThresholds.length, state.level + 1);
-  if (state.score < levelThresholds[nextLevel - 1]) return;
+  const nextLevel = Math.min(14, state.level + 1);
+  if (nextLevel === state.level || state.score < levelThresholds[nextLevel - 1]) return;
   state.level = nextLevel;
   state.lastUnlockedLevel = nextLevel;
   const removed = removeLowestDrink();
@@ -602,8 +631,13 @@ async function checkLevelUp() {
 }
 
 function removeLowestDrink() {
-  const lowest = drinkTypes.find((drink) => drink.unlock === 1)?.id;
+  const boardIds = state.board.flatMap((tray) => tray || []);
+  const lowestDrink = drinkTypes
+    .filter((drink) => boardIds.includes(drink.id))
+    .sort((a, b) => a.unlock - b.unlock)[0];
+  const lowest = lowestDrink?.id;
   let removed = 0;
+  if (!lowest) return 0;
   state.board = state.board.map((tray) => {
     if (!tray) return null;
     const kept = tray.filter((id) => {
@@ -664,6 +698,10 @@ function countDrink(tray, drinkId) {
 
 function findDrink(drinkId) {
   return drinkTypes.find((drink) => drink.id === drinkId);
+}
+
+function drinkLevel(drink) {
+  return Number(drink.id.replace("level", "")) || drink.unlock;
 }
 
 function lockInput() {

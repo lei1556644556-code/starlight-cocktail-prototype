@@ -4,58 +4,82 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>星光特调</title>
-    <link rel="stylesheet" href="styles.css?v=20260513-responsive-assets">
+    <link rel="stylesheet" href="styles.css?v=20260513-app-ui-14">
   </head>
   <body>
     <main class="app">
-      <section class="top-panel">
-        <div>
-          <p class="eyebrow">星光特调</p>
-          <h1>调酒接待</h1>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <span>酣畅值</span>
-            <strong id="score">0</strong>
+      <section class="game-shell">
+        <header class="game-hud">
+          <div class="brand-lockup">
+            <p class="eyebrow">星光特调</p>
+            <h1>Star Cocktail</h1>
           </div>
-          <div class="stat">
-            <span>特调币</span>
-            <strong id="coin">0</strong>
+          <div class="currency-strip">
+            <div class="hud-pill">
+              <span class="hud-icon">⚡</span>
+              <strong id="energy">50</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon">🍸</span>
+              <strong id="coin">0</strong>
+            </div>
+            <button id="newGameBtn" class="icon-command" type="button" aria-label="新开一局">↻</button>
           </div>
-          <div class="stat">
-            <span>体力</span>
-            <strong id="energy">50</strong>
+        </header>
+
+        <section class="stage">
+          <div class="hostess-wrap">
+            <img class="hostess" src="assets/ui/hostess.png" alt="">
           </div>
-          <div class="stat">
-            <span>等级</span>
-            <strong id="level">1</strong>
+          <div class="speech-card">
+            <div class="bubble" id="message">先把吧台的 3 个托盘放到桌面吧。</div>
+            <div class="progress-card">
+              <div class="progress-top">
+                <span>酣畅值</span>
+                <strong><span id="score">0</span>/<span id="scoreTarget">900</span></strong>
+              </div>
+              <div class="progress-bar"><span id="scoreFill"></span></div>
+              <div class="level-badge">Lv.<span id="level">1</span> 特调</div>
+            </div>
           </div>
-        </div>
-      </section>
+          <div class="side-cards">
+            <div class="reward-card">
+              <span>本期累计获得</span>
+              <strong>挑战卡 x<span id="challengeCount">0</span></strong>
+            </div>
+            <div class="best-card">
+              <span>历史最高酣畅值</span>
+              <strong id="bestScore">0</strong>
+            </div>
+          </div>
+        </section>
 
-      <section class="bar">
-        <div class="host">
-          <div class="portrait"></div>
-          <div class="bubble" id="message">先把吧台的 3 个托盘放到桌面吧。</div>
-        </div>
-        <div class="tools">
-          <button id="trashBtn" type="button">垃圾桶 <strong id="trashCount">2</strong></button>
-          <button id="tongsBtn" type="button">夹子 <strong id="tongsCount">2</strong></button>
-          <button id="newGameBtn" type="button">新开一局</button>
-        </div>
-      </section>
+        <section class="tool-bar">
+          <div class="feedback">
+            <div class="combo" id="combo">连击 x0</div>
+            <div class="sound" id="soundCue">音效：待机</div>
+          </div>
+          <div class="tools">
+            <button id="trashBtn" class="tool-button" type="button">
+              <span class="tool-icon">♻</span>
+              <span>垃圾桶</span>
+              <strong id="trashCount">2</strong>
+            </button>
+            <button id="tongsBtn" class="tool-button" type="button">
+              <span class="tool-icon">⌁</span>
+              <span>夹子</span>
+              <strong id="tongsCount">2</strong>
+            </button>
+          </div>
+        </section>
 
-      <section class="play-area">
-        <div class="board" id="board" aria-label="酒桌"></div>
-        <div class="queue" id="queue" aria-label="吧台托盘"></div>
-      </section>
+        <section class="play-area">
+          <div class="board" id="board" aria-label="酒桌"></div>
+          <div class="queue" id="queue" aria-label="吧台托盘"></div>
+        </section>
 
-      <section class="feedback">
-        <div class="combo" id="combo">连击 x0</div>
-        <div class="sound" id="soundCue">音效：待机</div>
+        <section class="legend" id="legend"></section>
       </section>
-
-      <section class="legend" id="legend"></section>
     </main>
 
     <div class="effects" id="effects"></div>
@@ -68,6 +92,6 @@
       </div>
     </div>
 
-    <script src="game.js?v=20260513-responsive-assets"></script>
+    <script src="game.js?v=20260513-app-ui-14"></script>
   </body>
 </html>
