@@ -23,6 +23,8 @@ const levelThresholds = [0, 900, 2300, 4600, 7600, 11500, 16500, 23000, 31500, 4
 const SUPABASE_URL = "https://dkaabuxszrbnnrajnoaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_8UjZAjC-Ts2NiP8_NpmFdA_jv-CEzhd";
 const PROFILE_KEY = "starlight-cocktail-profile-v1";
+const PLAYERS_TABLE = "starlight_players";
+const RESULTS_TABLE = "starlight_game_results";
 
 const supabaseClient = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) || null;
 let leaderboardMode = "score";
@@ -173,7 +175,7 @@ async function syncProfile() {
     phone: profile.phone || null,
   };
   const { data, error } = await supabaseClient
-    .from("players")
+    .from(PLAYERS_TABLE)
     .upsert(record, { onConflict: "guest_key" })
     .select("id, display_name, phone")
     .single();
@@ -218,7 +220,7 @@ async function submitGameResult() {
   const synced = profile.playerId ? true : await syncProfile();
   if (!synced || !profile.playerId) return;
   const bestDrink = drinkTypes[Math.max(0, result.bestFullLevel - 1)] || drinkTypes[0];
-  const { error } = await supabaseClient.from("game_results").insert({
+  const { error } = await supabaseClient.from(RESULTS_TABLE).insert({
     player_id: profile.playerId,
     score: result.score,
     best_cup_level: result.bestFullLevel,
@@ -236,7 +238,7 @@ function renderLeaderboardRows(rows) {
   }
   els.leaderboardList.innerHTML = rows
     .map((row, index) => {
-      const player = row.players?.display_name || "游客";
+      const player = row.player?.display_name || row.starlight_players?.display_name || row.players?.display_name || "游客";
       const main = leaderboardMode === "score" ? row.score : `Lv.${row.best_cup_level} ${row.best_cup_name}`;
       const sub = leaderboardMode === "score" ? `最高酒杯 Lv.${row.best_cup_level}` : `单局积分 ${row.score}`;
       return `<div class="rank-row">
@@ -260,13 +262,30 @@ async function loadLeaderboard(mode = leaderboardMode) {
     return;
   }
   let query = supabaseClient
-    .from("game_results")
-    .select("score,best_cup_level,best_cup_name,created_at,players(display_name)")
+    .from(RESULTS_TABLE)
+    .select("score,best_cup_level,best_cup_name,created_at,player:starlight_players(display_name)")
     .limit(20);
   query = mode === "score"
     ? query.order("score", { ascending: false }).order("best_cup_level", { ascending: false })
     : query.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && error.message?.includes("display_name")) {
+    let fallbackQuery = supabaseClient
+      .from(RESULTS_TABLE)
+      .select("score,best_cup_level,best_cup_name,created_at")
+      .limit(20);
+    fallbackQuery = mode === "score"
+      ? fallbackQuery.order("score", { ascending: false }).order("best_cup_level", { ascending: false })
+      : fallbackQuery.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+    const fallback = await fallbackQuery;
+    data = fallback.data;
+    error = fallback.error;
+    if (!error) {
+      els.leaderboardStatus.textContent = "排行榜已读取；数据库缺少昵称字段，当前先显示游客名。";
+      renderLeaderboardRows(data);
+      return;
+    }
+  }
   if (error) {
     els.leaderboardStatus.textContent = `排行榜读取失败：${error.message}`;
     renderLeaderboardRows([]);
