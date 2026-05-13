@@ -1,0 +1,849 @@
+const drinkTypes = [
+  { id: "blue", name: "蓝月", icon: "🍸", base: 80, unlock: 1 },
+  { id: "orange", name: "橙光", icon: "🥃", base: 110, unlock: 1 },
+  { id: "purple", name: "紫夜", icon: "🍷", base: 150, unlock: 2 },
+  { id: "red", name: "红星", icon: "🍹", base: 210, unlock: 3 },
+  { id: "mint", name: "薄荷", icon: "🧉", base: 300, unlock: 4 },
+  { id: "gold", name: "金辉", icon: "🥂", base: 430, unlock: 5 },
+];
+
+const ROWS = 4;
+const COLS = 4;
+const TRAY_CAPACITY = 6;
+const START_ENERGY = 50;
+const levelThresholds = [0, 900, 2300, 4600, 7600];
+
+const state = {
+  board: [],
+  queue: [],
+  drag: null,
+  hoverIndex: null,
+  tool: null,
+  score: 0,
+  coin: 0,
+  energy: START_ENERGY,
+  level: 1,
+  lastUnlockedLevel: 1,
+  bestFullLevel: 0,
+  combo: 0,
+  bestCombo: 0,
+  fullCount: 0,
+  trash: 2,
+  tongs: 2,
+  ended: false,
+  locked: false,
+  queueFresh: false,
+  cue: "待机",
+  audio: null,
+  pointerDrag: null,
+};
+
+const els = {
+  board: document.querySelector("#board"),
+  queue: document.querySelector("#queue"),
+  legend: document.querySelector("#legend"),
+  score: document.querySelector("#score"),
+  coin: document.querySelector("#coin"),
+  energy: document.querySelector("#energy"),
+  level: document.querySelector("#level"),
+  message: document.querySelector("#message"),
+  trashBtn: document.querySelector("#trashBtn"),
+  tongsBtn: document.querySelector("#tongsBtn"),
+  trashCount: document.querySelector("#trashCount"),
+  tongsCount: document.querySelector("#tongsCount"),
+  combo: document.querySelector("#combo"),
+  soundCue: document.querySelector("#soundCue"),
+  newGameBtn: document.querySelector("#newGameBtn"),
+  overlay: document.querySelector("#overlay"),
+  modalTitle: document.querySelector("#modalTitle"),
+  modalText: document.querySelector("#modalText"),
+  modalBtn: document.querySelector("#modalBtn"),
+  effects: document.querySelector("#effects"),
+};
+
+function startGame() {
+  state.board = Array.from({ length: ROWS * COLS }, () => null);
+  state.queue = [];
+  state.drag = null;
+  state.hoverIndex = null;
+  state.tool = null;
+  state.score = 0;
+  state.coin = 0;
+  state.energy = START_ENERGY;
+  state.level = 1;
+  state.lastUnlockedLevel = 1;
+  state.bestFullLevel = 0;
+  state.combo = 0;
+  state.bestCombo = 0;
+  state.fullCount = 0;
+  state.trash = 2;
+  state.tongs = 2;
+  state.ended = false;
+  state.locked = false;
+  state.queueFresh = true;
+  state.cue = "待机";
+  els.overlay.classList.add("hidden");
+  cleanupPointerDrag();
+  spawnQueue();
+  setMessage("拖动吧台托盘到桌面空格，绿色格子表示会触发合并。");
+  render();
+}
+
+function availableDrinks() {
+  return drinkTypes.filter((drink) => drink.unlock <= state.level);
+}
+
+function randomDrink() {
+  const pool = availableDrinks();
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function makeTray() {
+  const cups = [];
+  const drinkCount = 2 + Math.floor(Math.random() * 4);
+  const primary = randomDrink();
+  for (let i = 0; i < drinkCount; i += 1) {
+    cups.push(Math.random() < 0.68 ? primary.id : randomDrink().id);
+  }
+  return cups;
+}
+
+function spawnQueue() {
+  state.queue = Array.from({ length: 3 }, () => makeTray());
+  state.queueFresh = true;
+}
+
+function render() {
+  renderStats();
+  renderBoard();
+  renderQueue();
+  renderLegend();
+}
+
+function renderStats() {
+  els.score.textContent = state.score;
+  els.coin.textContent = state.coin;
+  els.energy.textContent = state.energy;
+  els.level.textContent = state.level;
+  els.trashCount.textContent = state.trash;
+  els.tongsCount.textContent = state.tongs;
+  els.combo.textContent = `连击 x${state.combo}`;
+  els.combo.classList.toggle("active", state.combo > 1);
+  els.soundCue.textContent = `音效：${state.cue}`;
+  els.soundCue.classList.toggle("active", state.cue !== "待机");
+  els.trashBtn.classList.toggle("active", state.tool === "trash");
+  els.tongsBtn.classList.toggle("active", state.tool === "tongs");
+  els.trashBtn.disabled = state.trash <= 0 || state.ended || state.locked;
+  els.tongsBtn.disabled = state.tongs <= 0 || state.ended || state.locked;
+}
+
+function renderBoard() {
+  els.board.innerHTML = "";
+  state.board.forEach((tray, index) => {
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.className = boardSlotClass(tray, index);
+    slot.dataset.index = index;
+    slot.addEventListener("dragover", (event) => onSlotDragOver(event, index));
+    slot.addEventListener("dragleave", () => {
+      if (state.hoverIndex === index) state.hoverIndex = null;
+      refreshBoardClasses();
+    });
+    slot.addEventListener("drop", (event) => onSlotDrop(event, index));
+    slot.addEventListener("click", () => onBoardClick(index));
+
+    if (tray) {
+      const trayEl = createTray(tray);
+      trayEl.dataset.boardIndex = index;
+      trayEl.draggable = false;
+      trayEl.addEventListener("dragstart", (event) => onBoardDragStart(event, index));
+      trayEl.addEventListener("dragend", onDragEnd);
+      trayEl.addEventListener("pointerdown", (event) => onBoardPointerDown(event, index));
+      slot.appendChild(trayEl);
+    }
+    els.board.appendChild(slot);
+  });
+}
+
+function boardSlotClass(tray, index) {
+  const classes = ["slot"];
+  if (!tray) classes.push("empty");
+  if (state.drag?.type === "queue" && !tray) {
+    classes.push("potential-drop");
+    if (willMergeAt(index, state.queue[state.drag.index])) classes.push("merge-place");
+  }
+  if (state.drag?.type === "board" && state.tool === "tongs") {
+    classes.push(index === state.drag.index ? "invalid" : "potential-drop");
+  }
+  if (state.hoverIndex === index) classes.push(tray && state.drag?.type === "queue" ? "invalid" : "hovered");
+  return classes.join(" ");
+}
+
+function renderQueue() {
+  els.queue.innerHTML = "";
+  state.queue.forEach((tray, index) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "queue-slot";
+    if (tray) {
+      const trayEl = createTray(tray);
+      trayEl.dataset.queueIndex = index;
+      trayEl.draggable = false;
+      if (state.drag?.type === "queue" && state.drag.index === index) trayEl.classList.add("dragging");
+      if (state.queueFresh) trayEl.classList.add("new");
+      trayEl.addEventListener("dragstart", (event) => onQueueDragStart(event, index));
+      trayEl.addEventListener("dragend", onDragEnd);
+      trayEl.addEventListener("pointerdown", (event) => onQueuePointerDown(event, index));
+      wrapper.appendChild(trayEl);
+    }
+    els.queue.appendChild(wrapper);
+  });
+  state.queueFresh = false;
+}
+
+function renderLegend() {
+  els.legend.innerHTML = "";
+  drinkTypes.forEach((drink) => {
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    if (drink.unlock <= state.level) item.classList.add("unlocked");
+    if (drink.unlock === state.lastUnlockedLevel && state.lastUnlockedLevel > 1) item.classList.add("just-unlocked");
+    item.innerHTML = `<span>${drink.icon}</span><span>${drink.name}</span><span>Lv.${drink.unlock}</span><span>${drink.base}</span>`;
+    els.legend.appendChild(item);
+  });
+}
+
+function createTray(cups) {
+  const tray = document.createElement("div");
+  tray.className = "tray";
+  const grid = document.createElement("div");
+  grid.className = "cups";
+  for (let i = 0; i < TRAY_CAPACITY; i += 1) {
+    const cup = document.createElement("div");
+    const drink = drinkTypes.find((item) => item.id === cups[i]);
+    cup.className = `cup ${drink ? "" : "empty-cup"}`;
+    cup.textContent = drink ? drink.icon : "";
+    grid.appendChild(cup);
+  }
+  tray.appendChild(grid);
+  return tray;
+}
+
+function onQueuePointerDown(event, index) {
+  if (state.locked || state.ended || state.tool === "trash" || !state.queue[index]) return;
+  beginPointerDrag(event, { type: "queue", index }, state.queue[index]);
+  setMessage("拖到桌面空格；绿色格子会产生合并。");
+  playCue("拿起托盘");
+}
+
+function onBoardPointerDown(event, index) {
+  if (state.locked || state.ended || state.tool !== "tongs" || !state.board[index]) {
+    if (state.tool === "tongs") shakeSlot(index, "夹子模式下才能拖动桌面托盘。");
+    return;
+  }
+  beginPointerDrag(event, { type: "board", index }, state.board[index]);
+  setMessage("把托盘拖到空格或另一个托盘上，松手后移动/交换。");
+  playCue("夹起托盘");
+}
+
+function beginPointerDrag(event, drag, cups) {
+  event.preventDefault();
+  cleanupPointerDrag();
+  state.drag = drag;
+  state.pointerDrag = {
+    startX: event.clientX,
+    startY: event.clientY,
+    active: false,
+    ghost: null,
+    cups: [...cups],
+  };
+  event.currentTarget.classList.add("dragging");
+  refreshBoardClasses();
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerUp);
+}
+
+function onPointerMove(event) {
+  if (!state.pointerDrag || !state.drag) return;
+  const moved = Math.hypot(event.clientX - state.pointerDrag.startX, event.clientY - state.pointerDrag.startY);
+  if (!state.pointerDrag.active && moved > 4) {
+    state.pointerDrag.active = true;
+    state.pointerDrag.ghost = createTray(state.pointerDrag.cups);
+    state.pointerDrag.ghost.classList.add("floating-drag");
+    els.effects.appendChild(state.pointerDrag.ghost);
+  }
+  if (state.pointerDrag.ghost) {
+    state.pointerDrag.ghost.style.left = `${event.clientX}px`;
+    state.pointerDrag.ghost.style.top = `${event.clientY}px`;
+  }
+  const slot = findSlotFromPoint(event.clientX, event.clientY);
+  state.hoverIndex = slot ? Number(slot.dataset.index) : null;
+  refreshBoardClasses();
+}
+
+function onPointerUp() {
+  if (!state.pointerDrag || !state.drag) return;
+  const drag = { ...state.drag };
+  const targetIndex = state.hoverIndex;
+  const wasActive = state.pointerDrag.active;
+  cleanupPointerDrag();
+  if (!wasActive || targetIndex === null || targetIndex === undefined) {
+    setMessage("拖动托盘到桌面格子后松手。");
+    render();
+    return;
+  }
+  if (drag.type === "queue") {
+    void placeQueueTray(drag.index, targetIndex);
+    return;
+  }
+  if (drag.type === "board") {
+    void moveBoardTray(drag.index, targetIndex);
+  }
+}
+
+function cleanupPointerDrag() {
+  document.removeEventListener?.("pointermove", onPointerMove);
+  document.removeEventListener?.("pointerup", onPointerUp);
+  state.pointerDrag?.ghost?.remove();
+  state.pointerDrag = null;
+  state.drag = null;
+  state.hoverIndex = null;
+}
+
+function findSlotFromPoint(x, y) {
+  let node = document.elementFromPoint?.(x, y);
+  while (node) {
+    if (node.dataset?.index !== undefined) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function onQueueDragStart(event, index) {
+  if (state.locked || state.ended || !state.queue[index]) {
+    event.preventDefault();
+    return;
+  }
+  state.tool = null;
+  state.drag = { type: "queue", index };
+  setDragData(event, "queue", index);
+  event.currentTarget.classList.add("dragging");
+  setMessage("拖到桌面空格；绿色格子会产生合并。");
+  playCue("拿起托盘");
+  refreshBoardClasses();
+}
+
+function onBoardDragStart(event, index) {
+  if (state.locked || state.ended || state.tool !== "tongs" || !state.board[index]) {
+    event.preventDefault();
+    shakeSlot(index, "夹子模式下才能拖动桌面托盘。");
+    return;
+  }
+  state.drag = { type: "board", index };
+  setDragData(event, "board", index);
+  event.currentTarget.classList.add("dragging");
+  setMessage("把托盘拖到空格或另一个托盘上，松手后移动/交换。");
+  playCue("夹起托盘");
+  refreshBoardClasses();
+}
+
+function setDragData(event, type, index) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", `${type}:${index}`);
+  if (event.currentTarget) {
+    event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, event.currentTarget.offsetHeight / 2);
+  }
+}
+
+function onSlotDragOver(event, index) {
+  if (!state.drag || state.locked || state.ended) return;
+  event.preventDefault();
+  state.hoverIndex = index;
+  event.dataTransfer.dropEffect = canDropAt(index) ? "move" : "none";
+  refreshBoardClasses();
+}
+
+async function onSlotDrop(event, index) {
+  event.preventDefault();
+  if (!state.drag || state.locked || state.ended) return;
+  const drag = { ...state.drag };
+  state.drag = null;
+  state.hoverIndex = null;
+  render();
+
+  if (drag.type === "queue") {
+    await placeQueueTray(drag.index, index);
+    return;
+  }
+  if (drag.type === "board") {
+    await moveBoardTray(drag.index, index);
+  }
+}
+
+function onDragEnd() {
+  state.drag = null;
+  state.hoverIndex = null;
+  render();
+}
+
+function refreshBoardClasses() {
+  state.board.forEach((tray, index) => {
+    const slot = slotEl(index);
+    if (slot) slot.className = boardSlotClass(tray, index);
+  });
+}
+
+function canDropAt(index) {
+  if (!state.drag) return false;
+  if (state.drag.type === "queue") return !state.board[index];
+  return state.drag.type === "board" && index !== state.drag.index && state.tool === "tongs";
+}
+
+async function placeQueueTray(queueIndex, boardIndex) {
+  if (!state.queue[queueIndex]) return;
+  if (state.board[boardIndex]) {
+    shakeSlot(boardIndex, "这里已经有托盘了，请拖到空桌位。");
+    playCue("无效操作");
+    return;
+  }
+  lockInput();
+  state.board[boardIndex] = [...state.queue[queueIndex]];
+  state.queue[queueIndex] = null;
+  spendEnergy(1);
+  playCue("放置");
+  render();
+  await animateSlot(boardIndex, "landed");
+  await resolveBoard(boardIndex);
+  await afterMove();
+  unlockInput();
+}
+
+async function moveBoardTray(fromIndex, toIndex) {
+  if (!state.board[fromIndex]) return;
+  if (fromIndex === toIndex) {
+    shakeSlot(toIndex, "不能放回原位。");
+    return;
+  }
+  lockInput();
+  const movingTray = state.board[fromIndex];
+  state.board[fromIndex] = state.board[toIndex];
+  state.board[toIndex] = movingTray;
+  state.tongs -= 1;
+  state.tool = null;
+  playCue("夹子");
+  render();
+  await animateSlot(toIndex, "landed");
+  await resolveBoard(toIndex);
+  if (state.board[fromIndex]) await resolveBoard(fromIndex);
+  await afterMove(false);
+  unlockInput();
+}
+
+function onBoardClick(index) {
+  if (state.ended || state.locked) return;
+  if (state.tool !== "trash") {
+    shakeSlot(index, "请拖动托盘进行放置。");
+    playCue("无效操作");
+    return;
+  }
+  useTrash(index);
+}
+
+async function useTrash(index) {
+  if (!state.board[index]) {
+    shakeSlot(index, "垃圾桶只能移除桌面上的托盘。");
+    playCue("无效操作");
+    return;
+  }
+  lockInput();
+  await animateSlot(index, "removing");
+  state.board[index] = null;
+  state.trash -= 1;
+  state.tool = null;
+  playCue("垃圾桶");
+  setMessage("已移除一个托盘。");
+  await afterMove(false);
+  unlockInput();
+}
+
+async function resolveBoard(centerIndex) {
+  let changed = true;
+  let guard = 0;
+  while (changed && guard < 14) {
+    changed = false;
+    guard += 1;
+    for (const index of mergeOrder(centerIndex)) {
+      if (!state.board[index]) continue;
+      const action = findMergeAround(index);
+      if (!action) continue;
+      await playMerge(action);
+      applyMerge(action);
+      changed = true;
+      clearEmptyTrays();
+      render();
+      await collectFullTrays();
+    }
+  }
+}
+
+function mergeOrder(index) {
+  const row = Math.floor(index / COLS);
+  const col = index % COLS;
+  return [
+    [row, col],
+    [row - 1, col],
+    [row + 1, col],
+    [row, col - 1],
+    [row, col + 1],
+  ]
+    .filter(([r, c]) => r >= 0 && r < ROWS && c >= 0 && c < COLS)
+    .map(([r, c]) => r * COLS + c);
+}
+
+function findMergeAround(index) {
+  for (const neighbor of mergeOrder(index).slice(1)) {
+    const action = makeMergeAction(index, neighbor);
+    if (action && action.amount > 0) return action;
+  }
+  return null;
+}
+
+function makeMergeAction(firstIndex, secondIndex) {
+  const first = state.board[firstIndex];
+  const second = state.board[secondIndex];
+  if (!first || !second) return null;
+  const shared = [...new Set(first)].filter((drinkId) => second.includes(drinkId));
+  if (shared.length === 0) return null;
+
+  let receiverIndex = firstIndex;
+  let donorIndex = secondIndex;
+  const firstKinds = new Set(first).size;
+  const secondKinds = new Set(second).size;
+  if (firstKinds > secondKinds) {
+    receiverIndex = secondIndex;
+    donorIndex = firstIndex;
+  } else if (firstKinds === secondKinds) {
+    const drinkId = shared[0];
+    if (countDrink(first, drinkId) < countDrink(second, drinkId)) {
+      receiverIndex = secondIndex;
+      donorIndex = firstIndex;
+    }
+  }
+
+  const receiver = state.board[receiverIndex];
+  const donor = state.board[donorIndex];
+  const drinkId = shared.find((id) => receiver.includes(id) && donor.includes(id));
+  if (!drinkId) return null;
+  const amount = Math.min(TRAY_CAPACITY - receiver.length, countDrink(donor, drinkId));
+  return amount > 0 ? { receiverIndex, donorIndex, drinkId, amount } : null;
+}
+
+async function playMerge(action) {
+  const drink = findDrink(action.drinkId);
+  flashSlots([action.receiverIndex, action.donorIndex]);
+  setMessage(`${drink.name}合并 x${action.amount}`);
+  playCue("合并");
+  for (let i = 0; i < action.amount; i += 1) {
+    flyCup(action.donorIndex, action.receiverIndex, drink.icon, i * 45);
+  }
+  await wait(430 + action.amount * 45);
+}
+
+function applyMerge(action) {
+  const receiver = state.board[action.receiverIndex];
+  const donor = state.board[action.donorIndex];
+  for (let i = 0; i < action.amount; i += 1) {
+    receiver.push(action.drinkId);
+    donor.splice(donor.indexOf(action.drinkId), 1);
+  }
+}
+
+async function collectFullTrays() {
+  let collected = false;
+  for (let index = 0; index < state.board.length; index += 1) {
+    const tray = state.board[index];
+    if (!tray || tray.length !== TRAY_CAPACITY || !tray.every((id) => id === tray[0])) continue;
+    const drink = findDrink(tray[0]);
+    const gained = Math.round(drink.base * (1 + state.combo * 0.18));
+    state.combo += 1;
+    state.bestCombo = Math.max(state.bestCombo, state.combo);
+    state.fullCount += 1;
+    state.score += gained;
+    state.coin += Math.ceil(gained / 10);
+    state.bestFullLevel = Math.max(state.bestFullLevel, drink.unlock);
+    setMessage(`${drink.name}满盘！接待完成，酣畅值 +${gained}。`);
+    playCue(state.combo > 1 ? `连击 x${state.combo}` : "满盘");
+    render();
+    burstAtSlot(index);
+    floatTextAtSlot(index, `+${gained}`);
+    await animateSlot(index, "full");
+    state.board[index] = null;
+    collected = true;
+    render();
+    await checkLevelUp();
+  }
+  return collected;
+}
+
+async function checkLevelUp() {
+  const nextLevel = Math.min(levelThresholds.length, state.level + 1);
+  if (state.score < levelThresholds[nextLevel - 1]) return;
+  state.level = nextLevel;
+  state.lastUnlockedLevel = nextLevel;
+  const removed = removeLowestDrink();
+  spawnQueue();
+  playCue("升级");
+  setMessage(`解锁 Lv.${state.level} 美酒，低级酒转化为酣畅值 +${removed * 20}。`);
+  render();
+  floatTextNearHeader(`解锁 Lv.${state.level}`);
+  await wait(720);
+}
+
+function removeLowestDrink() {
+  const lowest = drinkTypes.find((drink) => drink.unlock === 1)?.id;
+  let removed = 0;
+  state.board = state.board.map((tray) => {
+    if (!tray) return null;
+    const kept = tray.filter((id) => {
+      if (id === lowest) {
+        removed += 1;
+        return false;
+      }
+      return true;
+    });
+    return kept.length ? kept : null;
+  });
+  if (removed > 0) state.score += removed * 20;
+  return removed;
+}
+
+async function afterMove(shouldSpawn = true) {
+  clearEmptyTrays();
+  if (shouldSpawn && state.queue.every((tray) => !tray)) {
+    state.combo = 0;
+    spawnQueue();
+    playCue("刷新托盘");
+    setMessage("吧台刷新了 3 个新托盘。");
+    render();
+    await wait(380);
+  }
+  if (!hasLegalMove()) {
+    endGame();
+    return;
+  }
+  render();
+}
+
+function hasLegalMove() {
+  const hasQueueTray = state.queue.some(Boolean);
+  const hasEmptySlot = state.board.some((tray) => !tray);
+  return (hasQueueTray && hasEmptySlot) || state.trash > 0 || state.tongs > 0;
+}
+
+function willMergeAt(index, tray) {
+  if (!tray || state.board[index]) return false;
+  return mergeOrder(index).slice(1).some((neighbor) => {
+    const other = state.board[neighbor];
+    return other && tray.some((id) => other.includes(id));
+  });
+}
+
+function spendEnergy(amount) {
+  state.energy = Math.max(0, state.energy - amount);
+}
+
+function clearEmptyTrays() {
+  state.board = state.board.map((tray) => (tray && tray.length > 0 ? tray : null));
+}
+
+function countDrink(tray, drinkId) {
+  return tray.filter((id) => id === drinkId).length;
+}
+
+function findDrink(drinkId) {
+  return drinkTypes.find((drink) => drink.id === drinkId);
+}
+
+function lockInput() {
+  state.locked = true;
+  render();
+}
+
+function unlockInput() {
+  state.locked = false;
+  state.drag = null;
+  state.hoverIndex = null;
+  render();
+}
+
+function setMessage(text) {
+  els.message.textContent = text;
+}
+
+function playCue(name) {
+  state.cue = name;
+  playTone(name);
+  renderStats();
+  window.clearTimeout(playCue.timer);
+  playCue.timer = window.setTimeout(() => {
+    state.cue = "待机";
+    renderStats();
+  }, 900);
+}
+
+function playTone(name) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  try {
+    state.audio ||= new AudioContext();
+    const context = state.audio;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const toneMap = {
+      放置: 420,
+      合并: 620,
+      满盘: 860,
+      升级: 980,
+      失败: 180,
+      垃圾桶: 260,
+      夹子: 520,
+      刷新托盘: 700,
+      无效操作: 150,
+    };
+    oscillator.frequency.value = toneMap[name] || (name.startsWith("连击") ? 920 : 360);
+    oscillator.type = name === "失败" || name === "无效操作" ? "sawtooth" : "sine";
+    gain.gain.setValueAtTime(0.001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.16);
+  } catch {
+    // The visible cue above is the fallback when browser audio is blocked.
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function animateSlot(index, className) {
+  const slot = slotEl(index);
+  const tray = slot?.querySelector(".tray");
+  const target = tray || slot;
+  target?.classList.add(className);
+  await wait(className === "full" ? 620 : 320);
+  target?.classList.remove(className);
+}
+
+function flashSlots(indexes) {
+  indexes.forEach((index) => {
+    const slot = slotEl(index);
+    slot?.classList.add("flash");
+    window.setTimeout(() => slot?.classList.remove("flash"), 520);
+  });
+}
+
+function shakeSlot(index, message) {
+  const slot = slotEl(index);
+  slot?.classList.add("shake");
+  window.setTimeout(() => slot?.classList.remove("shake"), 320);
+  setMessage(message);
+}
+
+function flyCup(fromIndex, toIndex, icon, delay) {
+  const from = centerOf(slotEl(fromIndex));
+  const to = centerOf(slotEl(toIndex));
+  if (!from || !to) return;
+  const el = document.createElement("div");
+  el.className = "fly-cup";
+  el.textContent = icon;
+  el.style.left = `${from.x - 15}px`;
+  el.style.top = `${from.y - 15}px`;
+  els.effects.appendChild(el);
+  window.setTimeout(() => {
+    el.style.transform = `translate(${to.x - from.x}px, ${to.y - from.y}px) scale(0.78)`;
+    el.style.opacity = "0.15";
+  }, delay);
+  window.setTimeout(() => el.remove(), delay + 430);
+}
+
+function burstAtSlot(index) {
+  const center = centerOf(slotEl(index));
+  if (!center) return;
+  const el = document.createElement("div");
+  el.className = "burst";
+  el.style.left = `${center.x - 6}px`;
+  el.style.top = `${center.y - 6}px`;
+  els.effects.appendChild(el);
+  window.setTimeout(() => el.remove(), 620);
+}
+
+function floatTextAtSlot(index, text) {
+  const center = centerOf(slotEl(index));
+  if (!center) return;
+  createFloatText(text, center.x - 28, center.y - 28);
+}
+
+function floatTextNearHeader(text) {
+  const rect = els.level.getBoundingClientRect();
+  createFloatText(text, rect.left - 28, rect.top + 8);
+}
+
+function createFloatText(text, left, top) {
+  const el = document.createElement("div");
+  el.className = "float-text";
+  el.textContent = text;
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  els.effects.appendChild(el);
+  window.setTimeout(() => el.remove(), 900);
+}
+
+function centerOf(el) {
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function slotEl(index) {
+  return els.board.querySelector(`[data-index="${index}"]`);
+}
+
+function endGame() {
+  state.ended = true;
+  playCue("失败");
+  render();
+  els.modalTitle.textContent = "本局结束";
+  els.modalText.innerHTML = [
+    ["最终酣畅值", state.score],
+    ["特调币", state.coin],
+    ["最高美酒等级", `Lv.${state.bestFullLevel || 1}`],
+    ["满盘次数", state.fullCount],
+    ["最佳连击", `x${state.bestCombo}`],
+  ]
+    .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
+    .join("");
+  els.overlay.classList.remove("hidden");
+}
+
+els.trashBtn.addEventListener("click", () => {
+  if (state.trash <= 0 || state.ended || state.locked) return;
+  state.tool = state.tool === "trash" ? null : "trash";
+  state.drag = null;
+  setMessage(state.tool ? "选择桌面上的托盘移除。" : "已取消垃圾桶。");
+  render();
+});
+
+els.tongsBtn.addEventListener("click", () => {
+  if (state.tongs <= 0 || state.ended || state.locked) return;
+  state.tool = state.tool === "tongs" ? null : "tongs";
+  state.drag = null;
+  setMessage(state.tool ? "夹子已启用，拖动桌面托盘来移动或交换。" : "已取消夹子。");
+  render();
+});
+
+els.newGameBtn.addEventListener("click", startGame);
+els.modalBtn.addEventListener("click", startGame);
+
+startGame();
