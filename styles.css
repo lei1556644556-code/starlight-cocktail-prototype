@@ -53,9 +53,9 @@ button:disabled {
 }
 
 .app {
-  width: min(780px, calc(100vw - 18px));
+  width: min(591px, calc(100vw - 12px));
   margin: 0 auto;
-  padding: 12px 0 22px;
+  padding: 6px 0 14px;
 }
 
 .game-shell,
@@ -180,10 +180,10 @@ h1 {
 
 .stage {
   position: relative;
-  min-height: 238px;
+  min-height: 260px;
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) 150px;
-  gap: 9px;
+  grid-template-columns: 178px minmax(0, 1fr);
+  gap: 8px;
   margin: 0;
   padding: 8px 10px 8px;
   border-width: 0 0 1px;
@@ -196,15 +196,15 @@ h1 {
 .hostess-wrap {
   position: relative;
   align-self: end;
-  height: 228px;
+  height: 246px;
   overflow: visible;
 }
 
 .hostess {
   position: absolute;
-  left: -36px;
-  bottom: -10px;
-  width: 270px;
+  left: -34px;
+  bottom: -8px;
+  width: 258px;
   max-width: none;
   filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.45));
 }
@@ -213,36 +213,47 @@ h1 {
   align-self: center;
   display: grid;
   gap: 8px;
+  position: relative;
+  z-index: 2;
 }
 
 .bubble {
   position: relative;
   max-width: 100%;
-  min-height: 56px;
-  padding: 11px 16px 10px;
-  border: 2px solid rgba(174, 126, 76, 0.7);
+  min-height: 64px;
+  padding: 14px 18px 13px 32px;
+  border: 2px solid rgba(177, 125, 71, 0.82);
   border-radius: 8px;
   color: #4a3940;
-  background:
-    url("assets/ui/speech-bubble.png") center / 100% 100% no-repeat,
-    linear-gradient(180deg, #fffdf4, #f7ead7);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(180deg, #fffdf4, #f5e6cf);
+  box-shadow: inset 0 0 0 3px rgba(255, 249, 226, 0.86), 0 5px 0 rgba(112, 70, 50, 0.35);
   font-weight: 800;
-  font-size: 15px;
-  line-height: 1.35;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .bubble::before {
   content: "";
   position: absolute;
-  left: -12px;
-  bottom: 17px;
-  width: 20px;
-  height: 20px;
-  background: #f8eddb;
-  border-left: 2px solid rgba(174, 126, 76, 0.7);
-  border-bottom: 2px solid rgba(174, 126, 76, 0.7);
-  transform: rotate(45deg);
+  left: -18px;
+  bottom: 12px;
+  width: 34px;
+  height: 26px;
+  clip-path: polygon(0 45%, 100% 0, 100% 100%);
+  background: linear-gradient(180deg, #fffdf4, #f5e6cf);
+  border-left: 2px solid rgba(177, 125, 71, 0.82);
+  border-bottom: 2px solid rgba(177, 125, 71, 0.82);
+}
+
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: 10px;
+  bottom: -4px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(117, 65, 44, 0.18);
 }
 
 .progress-card,
@@ -251,13 +262,15 @@ h1 {
   border: 1px solid rgba(255, 216, 121, 0.45);
   border-radius: 8px;
   background:
-    url("assets/ui/panel-wide.png") center / 100% 100% no-repeat,
     linear-gradient(180deg, rgba(41, 31, 45, 0.88), rgba(78, 48, 76, 0.9));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
 .progress-card {
-  padding: 9px 12px;
+  padding: 12px 14px;
+  min-height: 84px;
+  display: grid;
+  align-content: center;
 }
 
 .progress-top {
@@ -299,19 +312,20 @@ h1 {
 }
 
 .side-cards {
-  align-self: center;
+  grid-column: 1 / -1;
+  align-self: stretch;
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
 .reward-card,
 .best-card {
   background:
-    url("assets/ui/panel-tall.png") center / 100% 100% no-repeat,
     linear-gradient(180deg, rgba(41, 31, 45, 0.88), rgba(78, 48, 76, 0.9));
   display: grid;
   gap: 4px;
-  padding: 10px 8px;
+  padding: 8px;
   text-align: center;
 }
 
@@ -351,12 +365,12 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 5px 10px;
+  gap: 8px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background:
-    url("assets/ui/button-gem.png") center / 100% 100% no-repeat,
-    linear-gradient(180deg, #72546c, #4b344d);
+  background: linear-gradient(180deg, #f043d1 0%, #b12eb5 52%, #6c2c79 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 232, 142, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 4px 8px rgba(0, 0, 0, 0.24);
+  line-height: 1;
 }
 
 .tool-icon {
@@ -374,7 +388,7 @@ h1 {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto;
   align-content: start;
-  gap: 9px;
+  gap: 8px;
   margin-top: 0;
   padding: 10px;
   border-width: 0;
@@ -477,18 +491,12 @@ h1 {
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: 66px;
-  padding: 4px 7px 2px;
+  aspect-ratio: 1.55 / 1;
+  min-height: 0;
+  padding: 7px 9px;
   border: 2px solid rgba(171, 117, 72, 0.88);
   border-radius: 8px;
-  background:
-    radial-gradient(ellipse at 25% 35%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    radial-gradient(ellipse at 50% 35%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    radial-gradient(ellipse at 75% 35%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    radial-gradient(ellipse at 25% 75%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    radial-gradient(ellipse at 50% 75%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    radial-gradient(ellipse at 75% 75%, rgba(137, 79, 47, 0.38) 0 12%, transparent 13%),
-    linear-gradient(145deg, #f3cf91, #c89058);
+  background: linear-gradient(145deg, #f3cf91, #c89058);
   box-shadow: 0 9px 12px rgba(0, 0, 0, 0.22);
   user-select: none;
   touch-action: none;
@@ -496,7 +504,7 @@ h1 {
 }
 
 .queue .tray {
-  width: min(142px, 64%);
+  width: min(132px, 62%);
   justify-self: center;
   cursor: grab;
   overflow: hidden;
@@ -504,16 +512,17 @@ h1 {
 }
 
 .queue .cups {
-  min-height: 50px;
+  height: 100%;
+  min-height: 0;
 }
 
 .queue .cup {
-  min-height: 25px;
+  min-height: 0;
 }
 
 .queue .cup-img {
-  width: clamp(30px, 4.7vw, 40px);
-  transform: translateY(-6px) scale(1);
+  width: clamp(28px, 4.1vw, 36px);
+  transform: translateY(-8px);
 }
 
 .queue .tray:active {
@@ -550,7 +559,7 @@ h1 {
   pointer-events: none;
   position: fixed;
   z-index: 40;
-  width: 132px;
+  width: 124px;
   opacity: 0.92;
   transform: translate(-50%, -50%) scale(0.96);
 }
@@ -559,8 +568,9 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  min-height: 62px;
+  gap: 2px 3px;
+  height: 100%;
+  min-height: 0;
   overflow: visible;
 }
 
@@ -568,19 +578,33 @@ h1 {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 31px;
+  min-height: 0;
   border-radius: 8px;
   font-size: 0;
   line-height: 1;
   filter: drop-shadow(0 4px 3px rgba(65, 33, 36, 0.28));
 }
 
+.cup::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: min(72%, 34px);
+  aspect-ratio: 1 / 0.54;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(146, 90, 45, 0.48);
+}
+
 .cup-img {
-  width: clamp(42px, 6vw, 56px);
+  position: relative;
+  z-index: 1;
+  width: clamp(38px, 5.1vw, 50px);
   max-width: none;
   height: auto;
   object-fit: contain;
-  transform: translateY(-14px) scale(1.12);
+  transform: translateY(-11px);
   pointer-events: none;
   user-select: none;
 }
@@ -823,8 +847,8 @@ h1 {
   }
 
   .app {
-    width: min(100vw - 10px, 620px);
-    padding-top: 6px;
+    width: min(100vw - 10px, 591px);
+    padding-top: 4px;
   }
 
   .game-hud {
@@ -863,7 +887,7 @@ h1 {
   }
 
   .stage {
-    min-height: 220px;
+    min-height: 255px;
     grid-template-columns: 142px minmax(0, 1fr);
     gap: 8px;
     padding: 8px 8px 6px;
@@ -1033,8 +1057,7 @@ h1 {
 
   .app {
     width: 100vw;
-    padding-left: 5px;
-    padding-right: 5px;
+    padding: 0 0 8px;
   }
 
   .game-hud {
@@ -1068,7 +1091,7 @@ h1 {
 
   .stage {
     grid-template-columns: 112px minmax(0, 1fr);
-    min-height: 210px;
+    min-height: 274px;
     padding-top: 6px;
   }
 
@@ -1083,7 +1106,16 @@ h1 {
   }
 
   .side-cards {
-    display: none;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .reward-card,
+  .best-card {
+    min-height: 44px;
+    padding: 6px 8px;
   }
 
   .tool-bar {
