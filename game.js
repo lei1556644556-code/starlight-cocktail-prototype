@@ -51,7 +51,12 @@ const state = {
 const els = {
   board: document.querySelector("#board"),
   queue: document.querySelector("#queue"),
-  legend: document.querySelector("#legend"),
+  drinkDexBtn: document.querySelector("#drinkDexBtn"),
+  drinkDexIcon: document.querySelector("#drinkDexIcon"),
+  drinkDexLevel: document.querySelector("#drinkDexLevel"),
+  drinkDexPanel: document.querySelector("#drinkDexPanel"),
+  drinkDexGrid: document.querySelector("#drinkDexGrid"),
+  drinkDexClose: document.querySelector("#drinkDexClose"),
   score: document.querySelector("#score"),
   coin: document.querySelector("#coin"),
   energy: document.querySelector("#energy"),
@@ -225,14 +230,18 @@ function renderQueue() {
 }
 
 function renderLegend() {
-  els.legend.innerHTML = "";
+  const bestDrink = drinkTypes
+    .filter((drink) => drink.unlock <= state.level)
+    .sort((a, b) => drinkLevel(b) - drinkLevel(a))[0] || drinkTypes[0];
+  els.drinkDexIcon.src = bestDrink.icon;
+  els.drinkDexLevel.textContent = `Lv.${drinkLevel(bestDrink)} ${bestDrink.name}`;
+  els.drinkDexGrid.innerHTML = "";
   drinkTypes.forEach((drink) => {
     const item = document.createElement("div");
-    item.className = "legend-item";
+    item.className = "drink-card";
     if (drink.unlock <= state.level) item.classList.add("unlocked");
-    if (drink.unlock === state.lastUnlockedLevel && state.lastUnlockedLevel > 1) item.classList.add("just-unlocked");
-    item.innerHTML = `<img class="legend-icon" src="${drink.icon}" alt=""><span>${drink.name}</span><span>Lv.${drinkLevel(drink)}</span><span>${drink.base}</span>`;
-    els.legend.appendChild(item);
+    item.innerHTML = `<img src="${drink.icon}" alt=""><strong>Lv.${drinkLevel(drink)}</strong><span>${drink.name}</span><span>${drink.base}</span>`;
+    els.drinkDexGrid.appendChild(item);
   });
 }
 
@@ -245,6 +254,7 @@ function createTray(cups) {
     const cup = document.createElement("div");
     const drink = drinkTypes.find((item) => item.id === cups[i]);
     cup.className = `cup ${drink ? "" : "empty-cup"}`;
+    cup.dataset.position = i + 1;
     if (drink) {
       const image = document.createElement("img");
       image.className = "cup-img";
@@ -887,5 +897,14 @@ els.tongsBtn.addEventListener("click", () => {
 
 els.newGameBtn.addEventListener("click", startGame);
 els.modalBtn.addEventListener("click", startGame);
+els.drinkDexBtn.addEventListener("click", () => {
+  els.drinkDexPanel.classList.remove("hidden");
+});
+els.drinkDexClose.addEventListener("click", () => {
+  els.drinkDexPanel.classList.add("hidden");
+});
+els.drinkDexPanel.addEventListener("click", (event) => {
+  if (event.target === els.drinkDexPanel) els.drinkDexPanel.classList.add("hidden");
+});
 
 startGame();

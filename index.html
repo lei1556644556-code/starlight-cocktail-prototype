@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>星光特调</title>
-    <link rel="stylesheet" href="styles.css?v=20260513-layout-fix2">
+    <link rel="stylesheet" href="styles.css?v=20260513-dex-no-stretch">
   </head>
   <body>
     <main class="app">
@@ -78,7 +78,13 @@
           <div class="queue" id="queue" aria-label="吧台托盘"></div>
         </section>
 
-        <section class="legend" id="legend"></section>
+        <section class="drink-dex-bar">
+          <button id="drinkDexBtn" class="drink-dex-button" type="button">
+            <img id="drinkDexIcon" class="drink-dex-icon" src="assets/drinks/level-01.png" alt="">
+            <span>当前最高</span>
+            <strong id="drinkDexLevel">Lv.1 蓝星</strong>
+          </button>
+        </section>
       </section>
     </main>
 
@@ -92,6 +98,16 @@
       </div>
     </div>
 
-    <script src="game.js?v=20260513-layout-fix2"></script>
+    <div class="overlay hidden" id="drinkDexPanel">
+      <div class="modal drink-dex-modal">
+        <div class="modal-head">
+          <h2>酒杯图鉴</h2>
+          <button id="drinkDexClose" class="icon-command" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="drink-dex-grid" id="drinkDexGrid"></div>
+      </div>
+    </div>
+
+    <script src="game.js?v=20260513-dex-no-stretch"></script>
   </body>
 </html>

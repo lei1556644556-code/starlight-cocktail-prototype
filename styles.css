@@ -63,7 +63,7 @@ button:disabled {
 .stage,
 .tool-bar,
 .play-area,
-.legend {
+.drink-dex-bar {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -71,9 +71,7 @@ button:disabled {
 }
 
 .game-shell {
-  min-height: calc(100svh - 24px);
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  display: block;
   overflow: visible;
   border-color: rgba(255, 216, 121, 0.36);
   background:
@@ -492,8 +490,8 @@ h1 {
   z-index: 1;
   width: 100%;
   aspect-ratio: 1.55 / 1;
-  min-height: 0;
-  padding: 7px 9px;
+  min-height: unset;
+  padding: 0;
   border: 2px solid rgba(171, 117, 72, 0.88);
   border-radius: 8px;
   background: linear-gradient(145deg, #f3cf91, #c89058);
@@ -521,8 +519,7 @@ h1 {
 }
 
 .queue .cup-img {
-  width: clamp(28px, 4.1vw, 36px);
-  transform: translateY(-8px);
+  width: clamp(24px, 3.7vw, 32px);
 }
 
 .queue .tray:active {
@@ -565,10 +562,9 @@ h1 {
 }
 
 .cups {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 2px 3px;
+  position: absolute;
+  inset: 8%;
+  display: block;
   height: 100%;
   min-height: 0;
   overflow: visible;
@@ -576,8 +572,9 @@ h1 {
 
 .cup {
   position: relative;
-  display: grid;
-  place-items: center;
+  position: absolute;
+  width: 27%;
+  height: 38%;
   min-height: 0;
   border-radius: 8px;
   font-size: 0;
@@ -585,11 +582,41 @@ h1 {
   filter: drop-shadow(0 4px 3px rgba(65, 33, 36, 0.28));
 }
 
+.cup[data-position="1"] {
+  left: 4%;
+  top: 2%;
+}
+
+.cup[data-position="2"] {
+  left: 36.5%;
+  top: 2%;
+}
+
+.cup[data-position="3"] {
+  left: 69%;
+  top: 2%;
+}
+
+.cup[data-position="4"] {
+  left: 4%;
+  top: 58%;
+}
+
+.cup[data-position="5"] {
+  left: 36.5%;
+  top: 58%;
+}
+
+.cup[data-position="6"] {
+  left: 69%;
+  top: 58%;
+}
+
 .cup::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: 58%;
+  top: 72%;
   width: min(72%, 34px);
   aspect-ratio: 1 / 0.54;
   border-radius: 50%;
@@ -600,11 +627,14 @@ h1 {
 .cup-img {
   position: relative;
   z-index: 1;
-  width: clamp(38px, 5.1vw, 50px);
+  position: absolute;
+  left: 50%;
+  bottom: 16%;
+  width: clamp(38px, 5.1vw, 48px);
   max-width: none;
   height: auto;
   object-fit: contain;
-  transform: translateY(-11px);
+  transform: translateX(-50%);
   pointer-events: none;
   user-select: none;
 }
@@ -614,25 +644,42 @@ h1 {
   background: transparent;
 }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.drink-dex-bar {
   margin-top: 0;
-  padding: 12px;
+  padding: 8px 10px;
   border-width: 1px 0 0;
   border-radius: 0;
   background: rgba(37, 26, 42, 0.9);
 }
 
-.legend-item.unlocked {
-  color: var(--text);
-  background: rgba(120, 230, 176, 0.12);
-  border: 1px solid rgba(120, 230, 176, 0.3);
+.drink-dex-button {
+  width: min(210px, 100%);
+  min-height: 48px;
+  display: inline-grid;
+  grid-template-columns: 34px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 12px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.legend-item.just-unlocked {
-  animation: flash 0.45s ease-in-out 3;
+.drink-dex-icon {
+  grid-row: 1 / 3;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.drink-dex-button span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.drink-dex-button strong {
+  color: var(--gold);
+  font-size: 14px;
 }
 
 .feedback {
@@ -714,6 +761,52 @@ h1 {
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.drink-dex-modal {
+  width: min(520px, 100%);
+}
+
+.drink-dex-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-height: min(62vh, 560px);
+  overflow: auto;
+}
+
+.drink-card {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 5px;
+  border: 1px solid rgba(255, 216, 121, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.drink-card.unlocked {
+  border-color: rgba(120, 230, 176, 0.42);
+  background: rgba(120, 230, 176, 0.12);
+}
+
+.drink-card img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+
+.drink-card span,
+.drink-card strong {
+  font-size: 12px;
 }
 
 .overlay {
@@ -1024,29 +1117,25 @@ h1 {
   }
 
   .tray {
-    min-height: 54px;
-    padding: 2px 5px 0;
+    min-height: unset;
     border-width: 1px;
   }
 
   .cups {
-    min-height: 50px;
+    min-height: 0;
   }
 
   .cup {
-    min-height: 29px;
+    min-height: 0;
   }
 
   .cup-img {
-    width: clamp(36px, 9vw, 48px);
-    transform: translateY(-8px) scale(1.08);
+    width: clamp(32px, 7.2vw, 40px);
   }
 
-  .legend {
+  .drink-dex-bar {
     max-height: 74px;
-    overflow: auto;
     padding: 7px;
-    gap: 6px;
   }
 }
 
@@ -1147,21 +1236,19 @@ h1 {
   }
 
   .tray {
-    min-height: 48px;
-    padding: 2px 4px 0;
+    min-height: unset;
   }
 
   .cups {
-    min-height: 46px;
+    min-height: 0;
   }
 
   .cup {
-    min-height: 24px;
+    min-height: 0;
   }
 
   .cup-img {
-    width: clamp(31px, 11vw, 40px);
-    transform: translateY(-7px) scale(1.05);
+    width: clamp(28px, 8.6vw, 34px);
   }
 
   .queue {
@@ -1181,33 +1268,26 @@ h1 {
 
   .queue .tray {
     width: 62%;
-    min-height: 44px;
+    min-height: unset;
   }
 
   .queue .cups {
-    min-height: 40px;
+    min-height: 0;
   }
 
   .queue .cup {
-    min-height: 20px;
+    min-height: 0;
   }
 
   .queue .cup-img {
-    width: 27px;
-    transform: translateY(-4px) scale(1);
+    width: 22px;
   }
 
   .floating-drag {
     width: 108px;
   }
 
-  .legend-item {
-    padding: 5px 7px;
-    font-size: 11px;
-  }
-
-  .legend-icon {
-    width: 19px;
-    height: 19px;
+  .drink-dex-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
