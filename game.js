@@ -20,6 +20,13 @@ const COLS = 4;
 const TRAY_CAPACITY = 6;
 const START_ENERGY = 50;
 const levelThresholds = [0, 900, 2300, 4600, 7600, 11500, 16500, 23000, 31500, 42500, 57000, 76000, 101000, 134000];
+const SUPABASE_URL = "https://dkaabuxszrbnnrajnoaa.supabase.co";
+const SUPABASE_KEY = "sb_publishable_8UjZAjC-Ts2NiP8_NpmFdA_jv-CEzhd";
+const PROFILE_KEY = "starlight-cocktail-profile-v1";
+
+const supabaseClient = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) || null;
+let leaderboardMode = "score";
+let profile = loadProfile();
 
 const state = {
   board: [],
@@ -46,9 +53,18 @@ const state = {
   cue: "待机",
   audio: null,
   pointerDrag: null,
+  resultSubmitted: false,
 };
 
 const els = {
+  loginScreen: document.querySelector("#loginScreen"),
+  loginNameInput: document.querySelector("#loginNameInput"),
+  guestLoginBtn: document.querySelector("#guestLoginBtn"),
+  loginStatus: document.querySelector("#loginStatus"),
+  loginHelpBtn: document.querySelector("#loginHelpBtn"),
+  playerNameLabel: document.querySelector("#playerNameLabel"),
+  profileBtn: document.querySelector("#profileBtn"),
+  leaderboardBtn: document.querySelector("#leaderboardBtn"),
   board: document.querySelector("#board"),
   queue: document.querySelector("#queue"),
   drinkDexBtn: document.querySelector("#drinkDexBtn"),
@@ -78,7 +94,192 @@ const els = {
   modalText: document.querySelector("#modalText"),
   modalBtn: document.querySelector("#modalBtn"),
   effects: document.querySelector("#effects"),
+  profilePanel: document.querySelector("#profilePanel"),
+  profileClose: document.querySelector("#profileClose"),
+  profileNameInput: document.querySelector("#profileNameInput"),
+  profilePhoneInput: document.querySelector("#profilePhoneInput"),
+  saveProfileBtn: document.querySelector("#saveProfileBtn"),
+  profileStatus: document.querySelector("#profileStatus"),
+  leaderboardPanel: document.querySelector("#leaderboardPanel"),
+  leaderboardClose: document.querySelector("#leaderboardClose"),
+  scoreRankTab: document.querySelector("#scoreRankTab"),
+  cupRankTab: document.querySelector("#cupRankTab"),
+  leaderboardList: document.querySelector("#leaderboardList"),
+  leaderboardStatus: document.querySelector("#leaderboardStatus"),
 };
+
+function makeGuestName() {
+  return `游客${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function makeGuestKey() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function loadProfile() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PROFILE_KEY) || "null");
+    if (saved?.guestKey) {
+      return {
+        guestKey: saved.guestKey,
+        playerId: saved.playerId || null,
+        displayName: saved.displayName || makeGuestName(),
+        phone: saved.phone || "",
+        hasEntered: Boolean(saved.hasEntered),
+      };
+    }
+  } catch {
+    // Fall through to a fresh local guest profile.
+  }
+  return {
+    guestKey: makeGuestKey(),
+    playerId: null,
+    displayName: makeGuestName(),
+    phone: "",
+    hasEntered: false,
+  };
+}
+
+function saveLocalProfile() {
+  window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+function renderProfile() {
+  els.playerNameLabel.textContent = profile.displayName;
+  els.loginNameInput.value = profile.displayName;
+  els.profileNameInput.value = profile.displayName;
+  els.profilePhoneInput.value = profile.phone || "";
+}
+
+function showLoginIfNeeded() {
+  if (profile.hasEntered) {
+    els.loginScreen.classList.add("hidden");
+    return;
+  }
+  els.loginScreen.classList.remove("hidden");
+}
+
+async function syncProfile() {
+  saveLocalProfile();
+  renderProfile();
+  if (!supabaseClient) {
+    setNetworkStatus("离线本地模式：Supabase SDK 未加载，玩法不受影响。");
+    return false;
+  }
+  const record = {
+    guest_key: profile.guestKey,
+    display_name: profile.displayName,
+    phone: profile.phone || null,
+  };
+  const { data, error } = await supabaseClient
+    .from("players")
+    .upsert(record, { onConflict: "guest_key" })
+    .select("id, display_name, phone")
+    .single();
+  if (error) {
+    setNetworkStatus(`同步失败：${error.message}`);
+    return false;
+  }
+  profile.playerId = data.id;
+  profile.displayName = data.display_name || profile.displayName;
+  profile.phone = data.phone || "";
+  saveLocalProfile();
+  renderProfile();
+  setNetworkStatus("资料已同步。");
+  return true;
+}
+
+function setNetworkStatus(text) {
+  if (els.loginStatus) els.loginStatus.textContent = text;
+  if (els.profileStatus) els.profileStatus.textContent = text;
+}
+
+function openProfilePanel() {
+  renderProfile();
+  els.profileStatus.textContent = supabaseClient ? "可修改昵称，手机号可选填。" : "当前离线本地保存，联网后会同步。";
+  els.profilePanel.classList.remove("hidden");
+}
+
+function closePanel(panel) {
+  panel.classList.add("hidden");
+}
+
+async function submitGameResult() {
+  if (state.resultSubmitted || state.score <= 0) return;
+  const result = {
+    score: state.score,
+    bestFullLevel: state.bestFullLevel || 1,
+    fullCount: state.fullCount,
+    bestCombo: state.bestCombo,
+  };
+  state.resultSubmitted = true;
+  if (!supabaseClient) return;
+  const synced = profile.playerId ? true : await syncProfile();
+  if (!synced || !profile.playerId) return;
+  const bestDrink = drinkTypes[Math.max(0, result.bestFullLevel - 1)] || drinkTypes[0];
+  const { error } = await supabaseClient.from("game_results").insert({
+    player_id: profile.playerId,
+    score: result.score,
+    best_cup_level: result.bestFullLevel,
+    best_cup_name: bestDrink.name,
+    full_count: result.fullCount,
+    best_combo: result.bestCombo,
+  });
+  if (error) setNetworkStatus(`成绩提交失败：${error.message}`);
+}
+
+function renderLeaderboardRows(rows) {
+  if (!rows?.length) {
+    els.leaderboardList.innerHTML = `<div class="empty-rank">暂无排行数据</div>`;
+    return;
+  }
+  els.leaderboardList.innerHTML = rows
+    .map((row, index) => {
+      const player = row.players?.display_name || "游客";
+      const main = leaderboardMode === "score" ? row.score : `Lv.${row.best_cup_level} ${row.best_cup_name}`;
+      const sub = leaderboardMode === "score" ? `最高酒杯 Lv.${row.best_cup_level}` : `单局积分 ${row.score}`;
+      return `<div class="rank-row">
+        <strong>${index + 1}</strong>
+        <span>${player}</span>
+        <em>${main}</em>
+        <small>${sub}</small>
+      </div>`;
+    })
+    .join("");
+}
+
+async function loadLeaderboard(mode = leaderboardMode) {
+  leaderboardMode = mode;
+  els.scoreRankTab.classList.toggle("active", mode === "score");
+  els.cupRankTab.classList.toggle("active", mode === "cup");
+  els.leaderboardList.innerHTML = `<div class="empty-rank">加载中...</div>`;
+  if (!supabaseClient) {
+    els.leaderboardStatus.textContent = "Supabase SDK 未加载，排行榜暂不可用。";
+    renderLeaderboardRows([]);
+    return;
+  }
+  let query = supabaseClient
+    .from("game_results")
+    .select("score,best_cup_level,best_cup_name,created_at,players(display_name)")
+    .limit(20);
+  query = mode === "score"
+    ? query.order("score", { ascending: false }).order("best_cup_level", { ascending: false })
+    : query.order("best_cup_level", { ascending: false }).order("score", { ascending: false });
+  const { data, error } = await query;
+  if (error) {
+    els.leaderboardStatus.textContent = `排行榜读取失败：${error.message}`;
+    renderLeaderboardRows([]);
+    return;
+  }
+  els.leaderboardStatus.textContent = mode === "score" ? "按单局酣畅值排序。" : "按最高酒杯等级排序。";
+  renderLeaderboardRows(data);
+}
+
+function openLeaderboardPanel() {
+  els.leaderboardPanel.classList.remove("hidden");
+  void loadLeaderboard(leaderboardMode);
+}
 
 function startGame() {
   state.board = Array.from({ length: ROWS * COLS }, () => null);
@@ -102,6 +303,7 @@ function startGame() {
   state.ended = false;
   state.locked = false;
   state.queueFresh = true;
+  state.resultSubmitted = false;
   state.cue = "待机";
   els.overlay.classList.add("hidden");
   cleanupPointerDrag();
@@ -866,6 +1068,7 @@ function endGame() {
   state.ended = true;
   playCue("失败");
   render();
+  void submitGameResult();
   els.modalTitle.textContent = "本局结束";
   els.modalText.innerHTML = [
     ["最终酣畅值", state.score],
@@ -878,6 +1081,48 @@ function endGame() {
     .join("");
   els.overlay.classList.remove("hidden");
 }
+
+function restartGame() {
+  void submitGameResult();
+  startGame();
+}
+
+els.guestLoginBtn.addEventListener("click", async () => {
+  const name = els.loginNameInput.value.trim();
+  if (name) profile.displayName = name.slice(0, 16);
+  profile.hasEntered = true;
+  saveLocalProfile();
+  renderProfile();
+  els.loginScreen.classList.add("hidden");
+  els.loginStatus.textContent = "正在同步游客资料...";
+  await syncProfile();
+});
+
+els.loginHelpBtn.addEventListener("click", () => {
+  els.loginStatus.textContent = "直接游客进入即可开玩；昵称和手机号之后都能在头像按钮里改。";
+});
+
+els.profileBtn.addEventListener("click", openProfilePanel);
+els.profileClose.addEventListener("click", () => closePanel(els.profilePanel));
+els.profilePanel.addEventListener("click", (event) => {
+  if (event.target === els.profilePanel) closePanel(els.profilePanel);
+});
+els.saveProfileBtn.addEventListener("click", async () => {
+  const name = els.profileNameInput.value.trim();
+  profile.displayName = name ? name.slice(0, 16) : makeGuestName();
+  profile.phone = els.profilePhoneInput.value.trim();
+  profile.hasEntered = true;
+  els.profileStatus.textContent = "保存中...";
+  await syncProfile();
+});
+
+els.leaderboardBtn.addEventListener("click", openLeaderboardPanel);
+els.leaderboardClose.addEventListener("click", () => closePanel(els.leaderboardPanel));
+els.leaderboardPanel.addEventListener("click", (event) => {
+  if (event.target === els.leaderboardPanel) closePanel(els.leaderboardPanel);
+});
+els.scoreRankTab.addEventListener("click", () => loadLeaderboard("score"));
+els.cupRankTab.addEventListener("click", () => loadLeaderboard("cup"));
 
 els.trashBtn.addEventListener("click", () => {
   if (state.trash <= 0 || state.ended || state.locked) return;
@@ -895,7 +1140,7 @@ els.tongsBtn.addEventListener("click", () => {
   render();
 });
 
-els.newGameBtn.addEventListener("click", startGame);
+els.newGameBtn.addEventListener("click", restartGame);
 els.modalBtn.addEventListener("click", startGame);
 els.drinkDexBtn.addEventListener("click", () => {
   els.drinkDexPanel.classList.remove("hidden");
@@ -907,4 +1152,7 @@ els.drinkDexPanel.addEventListener("click", (event) => {
   if (event.target === els.drinkDexPanel) els.drinkDexPanel.classList.add("hidden");
 });
 
+renderProfile();
+showLoginIfNeeded();
+if (profile.hasEntered) void syncProfile();
 startGame();
