@@ -491,16 +491,27 @@ h1 {
   background: rgba(47, 29, 50, 0.95);
 }
 
+.tool-bar:has(.end-run:not(.hidden)) {
+  align-items: center;
+}
+
+.tool-bar:has(.end-run:not(.hidden)) .feedback {
+  min-width: 86px;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
 .tools {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .tool-button {
   position: relative;
-  min-width: 104px;
+  min-width: 96px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -513,6 +524,7 @@ h1 {
 }
 
 .tool-button.end-run {
+  min-width: 118px;
   background: linear-gradient(180deg, #ff8b7f 0%, #d64c65 52%, #87324a 100%);
 }
 
@@ -1304,6 +1316,10 @@ h1 {
     padding: 7px 8px;
   }
 
+  .tool-bar:has(.end-run:not(.hidden)) {
+    gap: 5px;
+  }
+
   .feedback {
     display: grid;
     align-content: center;
@@ -1313,16 +1329,21 @@ h1 {
 
   .tools {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     flex: 1;
-    gap: 7px;
+    gap: 5px;
   }
 
   .tool-button {
     min-width: 0;
     min-height: 38px;
-    padding: 5px 8px;
+    padding: 5px 6px;
+    gap: 5px;
     font-size: 12px;
+  }
+
+  .tool-button.end-run {
+    min-width: 0;
   }
 
   .tool-icon {
@@ -1487,6 +1508,11 @@ h1 {
 
   .feedback {
     display: none;
+  }
+
+  .tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
   }
 
   .play-area {

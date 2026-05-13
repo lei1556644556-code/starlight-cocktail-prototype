@@ -793,7 +793,7 @@ function onQueuePointerDown(event, index) {
 }
 
 function onBoardPointerDown(event, index) {
-  if (state.needsToolChoice && state.tool !== "tongs") {
+  if (state.needsToolChoice && !state.tool) {
     promptToolChoice();
     return;
   }
