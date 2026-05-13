@@ -30,6 +30,7 @@ const REMOTE_SYNC_INTERVAL = 4200;
 
 const supabaseClient = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY) || null;
 let leaderboardMode = "score";
+let leaderboardRefreshTimer = null;
 let profile = loadProfile();
 
 const state = {
@@ -203,6 +204,14 @@ function setNetworkStatus(text) {
   if (els.profileStatus) els.profileStatus.textContent = text;
 }
 
+function syncTimeLabel() {
+  return new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function setLeaderboardStatus(text) {
+  if (els.leaderboardStatus) els.leaderboardStatus.textContent = text;
+}
+
 function openProfilePanel() {
   renderProfile();
   els.profileStatus.textContent = supabaseClient ? "可修改昵称，手机号可选填。" : "当前离线本地保存，联网后会同步。";
@@ -211,6 +220,7 @@ function openProfilePanel() {
 
 function closePanel(panel) {
   panel.classList.add("hidden");
+  if (panel === els.leaderboardPanel) stopLeaderboardAutoRefresh();
 }
 
 function serializableState() {
@@ -237,6 +247,11 @@ function serializableState() {
 function saveGameProgress() {
   if (state.ended) return;
   window.localStorage.setItem(SAVE_KEY, JSON.stringify(serializableState()));
+}
+
+function markProgressChanged() {
+  state.dirty = true;
+  saveGameProgress();
 }
 
 function scheduleGameSave() {
@@ -280,8 +295,16 @@ function clearGameProgress() {
   window.localStorage.removeItem(SAVE_KEY);
 }
 
+function flushGameProgress() {
+  if (!state.ended) saveGameProgress();
+}
+
 async function syncGameSnapshot({ final = false } = {}) {
-  if (!supabaseClient || (!state.dirty && !final && state.remoteResultId)) return;
+  if (!supabaseClient) {
+    setLeaderboardStatus("Supabase SDK 未加载，成绩暂未联网同步。");
+    return;
+  }
+  if (!state.dirty && !final && state.remoteResultId) return;
   const result = {
     score: state.score,
     bestFullLevel: state.bestFullLevel || 1,
@@ -289,7 +312,10 @@ async function syncGameSnapshot({ final = false } = {}) {
     bestCombo: state.bestCombo,
   };
   const synced = profile.playerId ? true : await syncProfile();
-  if (!synced || !profile.playerId) return;
+  if (!synced || !profile.playerId) {
+    setLeaderboardStatus("玩家资料未同步，成绩暂未上传。");
+    return;
+  }
   const bestDrink = drinkTypes[Math.max(0, result.bestFullLevel - 1)] || drinkTypes[0];
   const payload = {
     player_id: profile.playerId,
@@ -303,7 +329,11 @@ async function syncGameSnapshot({ final = false } = {}) {
     ? supabaseClient.from(RESULTS_TABLE).update(payload).eq("id", state.remoteResultId).select("id").maybeSingle()
     : supabaseClient.from(RESULTS_TABLE).insert(payload).select("id").single();
   const { data, error } = await request;
-  if (error) setNetworkStatus(`成绩提交失败：${error.message}`);
+  if (error) {
+    const message = `成绩同步失败：${error.message}`;
+    setNetworkStatus(message);
+    setLeaderboardStatus(message);
+  }
   if (!error && state.remoteResultId && !data) {
     state.remoteResultId = null;
     state.dirty = true;
@@ -314,6 +344,8 @@ async function syncGameSnapshot({ final = false } = {}) {
     if (data?.id) state.remoteResultId = data.id;
     state.dirty = false;
     saveGameProgress();
+    setLeaderboardStatus(`成绩已同步 ${syncTimeLabel()}，排行榜自动刷新中。`);
+    if (!els.leaderboardPanel.classList.contains("hidden")) void loadLeaderboard(leaderboardMode, { silent: true });
   }
 }
 
@@ -325,6 +357,7 @@ async function submitGameResult() {
 
 function startRealtimeSync() {
   window.clearInterval(state.syncTimer);
+  void syncGameSnapshot();
   state.syncTimer = window.setInterval(() => {
     void syncGameSnapshot();
   }, REMOTE_SYNC_INTERVAL);
@@ -350,13 +383,13 @@ function renderLeaderboardRows(rows) {
     .join("");
 }
 
-async function loadLeaderboard(mode = leaderboardMode) {
+async function loadLeaderboard(mode = leaderboardMode, { silent = false } = {}) {
   leaderboardMode = mode;
   els.scoreRankTab.classList.toggle("active", mode === "score");
   els.cupRankTab.classList.toggle("active", mode === "cup");
-  els.leaderboardList.innerHTML = `<div class="empty-rank">加载中...</div>`;
+  if (!silent) els.leaderboardList.innerHTML = `<div class="empty-rank">加载中...</div>`;
   if (!supabaseClient) {
-    els.leaderboardStatus.textContent = "Supabase SDK 未加载，排行榜暂不可用。";
+    setLeaderboardStatus("Supabase SDK 未加载，排行榜暂不可用。");
     renderLeaderboardRows([]);
     return;
   }
@@ -380,23 +413,36 @@ async function loadLeaderboard(mode = leaderboardMode) {
     data = fallback.data;
     error = fallback.error;
     if (!error) {
-      els.leaderboardStatus.textContent = "排行榜已读取；数据库缺少昵称字段，当前先显示游客名。";
+      setLeaderboardStatus(`排行榜已刷新 ${syncTimeLabel()}；数据库缺少昵称字段，当前先显示游客名。`);
       renderLeaderboardRows(data);
       return;
     }
   }
   if (error) {
-    els.leaderboardStatus.textContent = `排行榜读取失败：${error.message}`;
+    setLeaderboardStatus(`排行榜读取失败：${error.message}`);
     renderLeaderboardRows([]);
     return;
   }
-  els.leaderboardStatus.textContent = mode === "score" ? "按单局酣畅值排序。" : "按最高酒杯等级排序。";
+  setLeaderboardStatus(mode === "score" ? `按单局酣畅值排序，已刷新 ${syncTimeLabel()}。` : `按最高酒杯等级排序，已刷新 ${syncTimeLabel()}。`);
   renderLeaderboardRows(data);
 }
 
 function openLeaderboardPanel() {
   els.leaderboardPanel.classList.remove("hidden");
   void loadLeaderboard(leaderboardMode);
+  startLeaderboardAutoRefresh();
+}
+
+function startLeaderboardAutoRefresh() {
+  stopLeaderboardAutoRefresh();
+  leaderboardRefreshTimer = window.setInterval(() => {
+    if (!els.leaderboardPanel.classList.contains("hidden")) void loadLeaderboard(leaderboardMode, { silent: true });
+  }, 5000);
+}
+
+function stopLeaderboardAutoRefresh() {
+  window.clearInterval(leaderboardRefreshTimer);
+  leaderboardRefreshTimer = null;
 }
 
 function scoreRating(score) {
@@ -802,6 +848,7 @@ async function placeQueueTray(queueIndex, boardIndex) {
   state.board[boardIndex] = [...state.queue[queueIndex]];
   state.queue[queueIndex] = null;
   spendEnergy(1);
+  markProgressChanged();
   playCue("放置");
   render();
   await animateSlot(boardIndex, "landed");
@@ -824,6 +871,7 @@ async function moveBoardTray(fromIndex, toIndex) {
   state.board[toIndex] = movingTray;
   state.tongs -= 1;
   state.tool = null;
+  markProgressChanged();
   playCue("夹子");
   render();
   await animateSlot(toIndex, "landed");
@@ -856,6 +904,7 @@ async function useTrash(index) {
   state.board[index] = null;
   state.trash -= 1;
   state.tool = null;
+  markProgressChanged();
   playCue("垃圾桶");
   setMessage("已移除一个托盘。");
   await afterMove(false);
@@ -973,7 +1022,7 @@ async function collectFullTrays() {
     state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(drink));
     setMessage(`${drink.name}满盘！接待完成，酣畅值 +${gained}。`);
     playCue(state.combo > 1 ? `连击 x${state.combo}` : "满盘");
-    state.dirty = true;
+    markProgressChanged();
     render();
     burstAtSlot(index);
     floatTextAtSlot(index, `+${gained}`);
@@ -1314,6 +1363,10 @@ els.drinkDexClose.addEventListener("click", () => {
 });
 els.drinkDexPanel.addEventListener("click", (event) => {
   if (event.target === els.drinkDexPanel) els.drinkDexPanel.classList.add("hidden");
+});
+window.addEventListener("beforeunload", flushGameProgress);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushGameProgress();
 });
 
 renderProfile();
