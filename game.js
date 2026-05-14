@@ -1351,7 +1351,7 @@ function makeMergeAction(firstIndex, secondIndex, pairMergeHistory = new Set()) 
 }
 
 function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId, pairMergeHistory = new Set()) {
-  if (pairMergeHistory.has(pairMergeKey(receiverIndex, donorIndex))) return null;
+  if (pairMergeHistory.has(pairMergeKey(receiverIndex, donorIndex, drinkId))) return null;
   const receiver = state.board[receiverIndex];
   const donor = state.board[donorIndex];
   const space = TRAY_CAPACITY - receiver.length;
@@ -1368,15 +1368,15 @@ function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId, pairM
   return { receiverIndex, donorIndex, drinkId, amount, receiverCount, priority };
 }
 
-function pairMergeKey(firstIndex, secondIndex) {
+function pairMergeKey(firstIndex, secondIndex, drinkId) {
   const low = Math.min(firstIndex, secondIndex);
   const high = Math.max(firstIndex, secondIndex);
-  return `${low}-${high}`;
+  return `${low}-${high}-${drinkId}`;
 }
 
 function rememberPairMerge(action, pairMergeHistory) {
   if (action.type === "cluster") return;
-  pairMergeHistory.add(pairMergeKey(action.receiverIndex, action.donorIndex));
+  pairMergeHistory.add(pairMergeKey(action.receiverIndex, action.donorIndex, action.drinkId));
 }
 
 async function playMerge(action) {
