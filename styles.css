@@ -291,6 +291,18 @@ h1 {
   font-size: 19px;
 }
 
+.audio-toggle {
+  font-weight: 800;
+  color: #fffdf1;
+}
+
+.audio-toggle.off {
+  color: #f1cab0;
+  border-color: rgba(255, 155, 130, 0.6);
+  background: linear-gradient(180deg, rgba(54, 39, 52, 0.96), rgba(86, 50, 62, 0.92));
+  opacity: 0.86;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(86px, 1fr));

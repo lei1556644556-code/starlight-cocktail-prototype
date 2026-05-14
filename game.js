@@ -28,6 +28,7 @@ const PLAYERS_TABLE = "starlight_players";
 const RESULTS_TABLE = "starlight_game_results";
 const REMOTE_SYNC_INTERVAL = 4200;
 const AUDIO_ROOT = "assets/audio";
+const AUDIO_PREF_KEY = "starlight-cocktail-audio-v1";
 
 const sfxMap = {
   "拿起托盘": "pickup.wav",
@@ -86,6 +87,7 @@ const state = {
   audio: null,
   bgm: null,
   audioUnlocked: false,
+  audioEnabled: loadAudioEnabled(),
   pointerDrag: null,
   resultSubmitted: false,
   remoteResultId: null,
@@ -103,6 +105,7 @@ const els = {
   playerNameLabel: document.querySelector("#playerNameLabel"),
   profileBtn: document.querySelector("#profileBtn"),
   leaderboardBtn: document.querySelector("#leaderboardBtn"),
+  audioToggleBtn: document.querySelector("#audioToggleBtn"),
   board: document.querySelector("#board"),
   queue: document.querySelector("#queue"),
   drinkDexBtn: document.querySelector("#drinkDexBtn"),
@@ -256,7 +259,49 @@ function setNetworkStatus(text) {
   if (els.profileStatus) els.profileStatus.textContent = text;
 }
 
+function loadAudioEnabled() {
+  try {
+    return window.localStorage.getItem(AUDIO_PREF_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function saveAudioEnabled() {
+  try {
+    window.localStorage.setItem(AUDIO_PREF_KEY, state.audioEnabled ? "on" : "off");
+  } catch {
+    // Audio preference is nice-to-have; gameplay should continue if storage is blocked.
+  }
+}
+
+function renderAudioToggle() {
+  if (!els.audioToggleBtn) return;
+  els.audioToggleBtn.textContent = state.audioEnabled ? "♪" : "×";
+  els.audioToggleBtn.classList.toggle("off", !state.audioEnabled);
+  els.audioToggleBtn.setAttribute("aria-label", state.audioEnabled ? "关闭音效" : "开启音效");
+  els.audioToggleBtn.title = state.audioEnabled ? "关闭音效" : "开启音效";
+}
+
+function setAudioEnabled(enabled) {
+  state.audioEnabled = enabled;
+  saveAudioEnabled();
+  renderAudioToggle();
+  if (!enabled) {
+    state.bgm?.pause();
+    state.audio?.suspend?.().catch?.(() => {});
+    return;
+  }
+  if (state.audio?.state === "suspended") state.audio.resume?.().catch?.(() => {});
+  if (state.audioUnlocked && state.bgm) {
+    state.bgm.play().catch(() => {});
+    return;
+  }
+  initAudio();
+}
+
 function initAudio() {
+  if (!state.audioEnabled) return;
   if (state.audioUnlocked) return;
   state.audioUnlocked = true;
   state.bgm ||= new Audio(`${AUDIO_ROOT}/music/lounge-loop.wav`);
@@ -266,20 +311,25 @@ function initAudio() {
 }
 
 function playAudioFile(src, volume = 0.72) {
-  if (!state.audioUnlocked) return;
+  if (!state.audioEnabled || !state.audioUnlocked) return false;
   const audio = new Audio(src);
   audio.volume = volume;
   audio.play().catch(() => {});
+  return true;
 }
 
 function playSfx(name) {
+  if (!state.audioEnabled) return false;
   const file = name.endsWith?.(".wav") ? name : sfxMap[name] || (name.startsWith("连击") ? "full-tray.wav" : null);
-  if (file) playAudioFile(`${AUDIO_ROOT}/sfx/${file}`, 0.68);
+  if (file) return playAudioFile(`${AUDIO_ROOT}/sfx/${file}`, 0.68);
+  return false;
 }
 
 function playNpcVoice(key) {
+  if (!state.audioEnabled) return false;
   const file = voiceMap[key];
-  if (file) playAudioFile(`${AUDIO_ROOT}/voice/${file}`, 0.88);
+  if (file) return playAudioFile(`${AUDIO_ROOT}/voice/${file}`, 0.88);
+  return false;
 }
 
 function syncTimeLabel() {
@@ -1333,8 +1383,8 @@ function setMessage(text) {
 
 function playCue(name) {
   state.cue = name;
-  playSfx(name);
-  playTone(name);
+  const playedFile = playSfx(name);
+  if (!playedFile) playTone(name);
   renderStats();
   window.clearTimeout(playCue.timer);
   playCue.timer = window.setTimeout(() => {
@@ -1344,6 +1394,7 @@ function playCue(name) {
 }
 
 function playTone(name) {
+  if (!state.audioEnabled) return;
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return;
   try {
@@ -1568,6 +1619,9 @@ els.saveProfileBtn.addEventListener("click", async () => {
 });
 
 els.leaderboardBtn.addEventListener("click", openLeaderboardPanel);
+els.audioToggleBtn?.addEventListener("click", () => {
+  setAudioEnabled(!state.audioEnabled);
+});
 els.leaderboardClose.addEventListener("click", () => closePanel(els.leaderboardPanel));
 els.leaderboardPanel.addEventListener("click", (event) => {
   if (event.target === els.leaderboardPanel) closePanel(els.leaderboardPanel);
@@ -1618,6 +1672,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") flushGameProgress();
 });
 
+renderAudioToggle();
 renderProfile();
 showLoginIfNeeded();
 if (profile.hasEntered) void syncProfile();

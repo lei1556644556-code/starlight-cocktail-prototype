@@ -80,6 +80,14 @@ function noise(duration, { volume = 0.25, lowpass = 0.82 } = {}) {
   return out;
 }
 
+function chime(freq, duration, { volume = 0.3, glide = 0 } = {}) {
+  return mix([
+    { offset: 0, samples: tone(freq, duration, { volume, attack: 0.004, release: duration * 0.68, glide }) },
+    { offset: 0, samples: tone(freq * 2.01, duration * 0.8, { volume: volume * 0.34, attack: 0.003, release: duration * 0.56, glide: glide * 0.45 }) },
+    { offset: 0.006, samples: tone(freq * 3.02, duration * 0.52, { volume: volume * 0.16, attack: 0.002, release: duration * 0.42 }) },
+  ]);
+}
+
 function makeMusic() {
   const bpm = 82;
   const beat = 60 / bpm;
@@ -102,23 +110,23 @@ function makeMusic() {
       const note = chord[step % chord.length] * 2;
       parts.push({ offset: offset + step * beat * 0.5, samples: tone(note, beat * 0.42, { volume: 0.045, attack: 0.02, release: 0.16, wave: "triangle" }) });
     }
-    parts.push({ offset, samples: tone(chord[0] / 2, beat * 3.6, { volume: 0.08, attack: 0.02, release: 0.35, wave: "sine" }) });
+    parts.push({ offset, samples: tone(chord[0] / 2, beat * 3.6, { volume: 0.045, attack: 0.02, release: 0.35, wave: "sine" }) });
   }
   writeWav(path.join(musicDir, "lounge-loop.wav"), mix(parts));
 }
 
 const sfx = {
-  "ui-click.wav": mix([{ offset: 0, samples: tone(660, 0.08, { volume: 0.22, release: 0.04 }) }, { offset: 0.035, samples: tone(990, 0.08, { volume: 0.14, release: 0.04 }) }]),
-  "pickup.wav": mix([{ offset: 0, samples: tone(420, 0.12, { volume: 0.22, glide: 180, wave: "triangle" }) }]),
-  "place.wav": mix([{ offset: 0, samples: tone(360, 0.09, { volume: 0.18, wave: "triangle" }) }, { offset: 0.06, samples: tone(520, 0.12, { volume: 0.16 }) }]),
-  "merge.wav": mix([{ offset: 0, samples: tone(620, 0.14, { volume: 0.24, wave: "triangle" }) }, { offset: 0.08, samples: tone(840, 0.18, { volume: 0.2 }) }]),
-  "full-tray.wav": mix([{ offset: 0, samples: tone(760, 0.18, { volume: 0.22 }) }, { offset: 0.1, samples: tone(980, 0.22, { volume: 0.18 }) }, { offset: 0.18, samples: tone(1240, 0.28, { volume: 0.16 }) }]),
-  "level-up.wav": mix([{ offset: 0, samples: tone(520, 0.16, { volume: 0.2 }) }, { offset: 0.12, samples: tone(760, 0.18, { volume: 0.2 }) }, { offset: 0.26, samples: tone(1120, 0.32, { volume: 0.18 }) }]),
-  "invalid.wav": mix([{ offset: 0, samples: tone(180, 0.16, { volume: 0.22, wave: "saw", glide: -60 }) }]),
-  "trash.wav": mix([{ offset: 0, samples: noise(0.18, { volume: 0.22 }) }, { offset: 0.05, samples: tone(260, 0.12, { volume: 0.14, wave: "triangle" }) }]),
-  "tongs.wav": mix([{ offset: 0, samples: tone(520, 0.08, { volume: 0.2, wave: "triangle" }) }, { offset: 0.07, samples: tone(620, 0.09, { volume: 0.16, wave: "triangle" }) }]),
-  "refresh.wav": mix([{ offset: 0, samples: tone(700, 0.12, { volume: 0.18, glide: 180 }) }, { offset: 0.1, samples: tone(520, 0.16, { volume: 0.16, glide: 140 }) }]),
-  "game-over.wav": mix([{ offset: 0, samples: tone(360, 0.18, { volume: 0.2, wave: "triangle" }) }, { offset: 0.16, samples: tone(240, 0.32, { volume: 0.2, wave: "triangle" }) }]),
+  "ui-click.wav": mix([{ offset: 0, samples: chime(1180, 0.07, { volume: 0.18 }) }, { offset: 0.026, samples: chime(1620, 0.07, { volume: 0.12 }) }]),
+  "pickup.wav": mix([{ offset: 0, samples: chime(920, 0.11, { volume: 0.19, glide: 260 }) }, { offset: 0.035, samples: chime(1480, 0.08, { volume: 0.1 }) }]),
+  "place.wav": mix([{ offset: 0, samples: chime(760, 0.09, { volume: 0.15 }) }, { offset: 0.048, samples: chime(1180, 0.11, { volume: 0.16 }) }]),
+  "merge.wav": mix([{ offset: 0, samples: chime(980, 0.12, { volume: 0.18 }) }, { offset: 0.065, samples: chime(1380, 0.14, { volume: 0.17 }) }, { offset: 0.12, samples: chime(1880, 0.13, { volume: 0.12 }) }]),
+  "full-tray.wav": mix([{ offset: 0, samples: chime(1040, 0.14, { volume: 0.17 }) }, { offset: 0.085, samples: chime(1460, 0.16, { volume: 0.15 }) }, { offset: 0.17, samples: chime(2120, 0.2, { volume: 0.12 }) }]),
+  "level-up.wav": mix([{ offset: 0, samples: chime(880, 0.13, { volume: 0.15 }) }, { offset: 0.1, samples: chime(1320, 0.15, { volume: 0.16 }) }, { offset: 0.21, samples: chime(1760, 0.18, { volume: 0.15 }) }, { offset: 0.32, samples: chime(2360, 0.2, { volume: 0.11 }) }]),
+  "invalid.wav": mix([{ offset: 0, samples: tone(520, 0.08, { volume: 0.12, wave: "triangle", glide: -80, release: 0.05 }) }, { offset: 0.075, samples: tone(420, 0.08, { volume: 0.1, wave: "triangle", release: 0.05 }) }]),
+  "trash.wav": mix([{ offset: 0, samples: noise(0.13, { volume: 0.12, lowpass: 0.62 }) }, { offset: 0.035, samples: chime(820, 0.09, { volume: 0.12 }) }]),
+  "tongs.wav": mix([{ offset: 0, samples: chime(1120, 0.07, { volume: 0.16 }) }, { offset: 0.06, samples: chime(1480, 0.08, { volume: 0.13 }) }]),
+  "refresh.wav": mix([{ offset: 0, samples: chime(980, 0.1, { volume: 0.13, glide: 260 }) }, { offset: 0.08, samples: chime(1420, 0.12, { volume: 0.13, glide: 180 }) }]),
+  "game-over.wav": mix([{ offset: 0, samples: tone(720, 0.14, { volume: 0.14, wave: "triangle", release: 0.08 }) }, { offset: 0.13, samples: tone(560, 0.18, { volume: 0.12, wave: "triangle", release: 0.12 }) }, { offset: 0.29, samples: tone(440, 0.2, { volume: 0.1, wave: "triangle", release: 0.14 }) }]),
 };
 
 makeMusic();
