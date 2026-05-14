@@ -1170,10 +1170,6 @@ async function resolveBoard(centerIndex) {
     seenStates.add(signature);
     changed = false;
     guard += 1;
-    if (await collectFullTrays()) {
-      changed = true;
-      continue;
-    }
     const clusterAction = findClusterMerge(centerIndex);
     if (clusterAction) {
       await playMerge(clusterAction);
@@ -1182,6 +1178,10 @@ async function resolveBoard(centerIndex) {
       clearEmptyTrays();
       render();
       await wait(160);
+      continue;
+    }
+    if (await collectFullTrays()) {
+      changed = true;
       continue;
     }
     for (const index of mergeScanOrder(centerIndex)) {
