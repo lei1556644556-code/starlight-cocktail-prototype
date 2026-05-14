@@ -1159,7 +1159,15 @@ async function useTrash(index) {
 async function resolveBoard(centerIndex) {
   let changed = true;
   let guard = 0;
-  while (changed && guard < 80) {
+  const seenStates = new Set();
+  const pairMergeHistory = new Set();
+  while (changed && guard < 28) {
+    const signature = boardSignature();
+    if (seenStates.has(signature)) {
+      setMessage("酒杯已经整理到当前稳定状态。");
+      break;
+    }
+    seenStates.add(signature);
     changed = false;
     guard += 1;
     if (await collectFullTrays()) {
@@ -1178,10 +1186,11 @@ async function resolveBoard(centerIndex) {
     }
     for (const index of mergeScanOrder(centerIndex)) {
       if (!state.board[index]) continue;
-      const action = findMergeAround(index);
+      const action = findMergeAround(index, pairMergeHistory);
       if (!action) continue;
       await playMerge(action);
       applyMerge(action);
+      rememberPairMerge(action, pairMergeHistory);
       changed = true;
       clearEmptyTrays();
       render();
@@ -1189,7 +1198,14 @@ async function resolveBoard(centerIndex) {
       break;
     }
   }
+  if (guard >= 28) setMessage("本次自动整理先到这里，请继续放置托盘。");
   await collectFullTrays();
+}
+
+function boardSignature() {
+  return state.board
+    .map((tray) => (tray ? [...tray].sort().join(",") : ""))
+    .join("|");
 }
 
 function mergeScanOrder(centerIndex) {
@@ -1218,9 +1234,9 @@ function mergeOrder(index) {
     .map(([r, c]) => r * COLS + c);
 }
 
-function findMergeAround(index) {
+function findMergeAround(index, pairMergeHistory = new Set()) {
   for (const neighbor of mergeOrder(index).slice(1)) {
-    const action = makeMergeAction(index, neighbor);
+    const action = makeMergeAction(index, neighbor, pairMergeHistory);
     if (action && action.amount > 0) return action;
   }
   return null;
@@ -1317,7 +1333,7 @@ function chooseClusterReceiver(stat, usedReceivers) {
   return ranked[0]?.index ?? null;
 }
 
-function makeMergeAction(firstIndex, secondIndex) {
+function makeMergeAction(firstIndex, secondIndex, pairMergeHistory = new Set()) {
   const first = state.board[firstIndex];
   const second = state.board[secondIndex];
   if (!first || !second) return null;
@@ -1326,15 +1342,16 @@ function makeMergeAction(firstIndex, secondIndex) {
 
   const candidates = [];
   shared.forEach((drinkId) => {
-    candidates.push(makeDirectionalMergeCandidate(firstIndex, secondIndex, drinkId));
-    candidates.push(makeDirectionalMergeCandidate(secondIndex, firstIndex, drinkId));
+    candidates.push(makeDirectionalMergeCandidate(firstIndex, secondIndex, drinkId, pairMergeHistory));
+    candidates.push(makeDirectionalMergeCandidate(secondIndex, firstIndex, drinkId, pairMergeHistory));
   });
   return candidates
     .filter(Boolean)
     .sort((a, b) => b.priority - a.priority || b.amount - a.amount || b.receiverCount - a.receiverCount)[0] || null;
 }
 
-function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId) {
+function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId, pairMergeHistory = new Set()) {
+  if (pairMergeHistory.has(pairMergeKey(receiverIndex, donorIndex))) return null;
   const receiver = state.board[receiverIndex];
   const donor = state.board[donorIndex];
   const space = TRAY_CAPACITY - receiver.length;
@@ -1349,6 +1366,17 @@ function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId) {
   const dominance = receiverCount - donorCount;
   const priority = willComplete * 1000 + dominance * 120 + receiverCount * 30 + amount * 10 + receiverPurity;
   return { receiverIndex, donorIndex, drinkId, amount, receiverCount, priority };
+}
+
+function pairMergeKey(firstIndex, secondIndex) {
+  const low = Math.min(firstIndex, secondIndex);
+  const high = Math.max(firstIndex, secondIndex);
+  return `${low}-${high}`;
+}
+
+function rememberPairMerge(action, pairMergeHistory) {
+  if (action.type === "cluster") return;
+  pairMergeHistory.add(pairMergeKey(action.receiverIndex, action.donorIndex));
 }
 
 async function playMerge(action) {
