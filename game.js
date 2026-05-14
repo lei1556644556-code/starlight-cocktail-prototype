@@ -1551,8 +1551,22 @@ function applyClusterMerge(action) {
 async function playFullColorClear(action) {
   flashSlots(action.trayIndexes);
   setMessage(`${action.drink.name}集齐 6 杯，优先完成满盘！`);
+  playCue("合并");
+  const flights = [];
+  let flightIndex = 0;
+  let remainingMoves = Math.max(0, TRAY_CAPACITY - countDrink(state.board[action.centerIndex], action.drinkId));
+  action.trayIndexes
+    .filter((index) => index !== action.centerIndex)
+    .forEach((donorIndex) => {
+      const amount = Math.min(countDrink(state.board[donorIndex], action.drinkId), remainingMoves);
+      for (let i = 0; i < amount; i += 1) {
+        flights.push(flyCup({ donorIndex, receiverIndex: action.centerIndex, drinkId: action.drinkId }, action.drink, i, flightIndex * 70));
+        flightIndex += 1;
+      }
+      remainingMoves -= amount;
+    });
+  await Promise.all(flights);
   playCue(state.combo > 1 ? `连击 x${state.combo + 1}` : "满盘");
-  await wait(160);
   burstAtSlot(action.centerIndex);
   floatTextAtSlot(action.centerIndex, "满盘");
   await wait(420);
