@@ -876,9 +876,9 @@ h1 {
 
 .cups {
   position: absolute;
-  inset: 8%;
+  inset: 8% 8% 10%;
   display: block;
-  height: 100%;
+  height: auto;
   min-height: 0;
   overflow: visible;
 }
@@ -941,8 +941,8 @@ h1 {
   position: relative;
   z-index: 1;
   position: absolute;
-  left: 50%;
-  bottom: 2%;
+  left: 54%;
+  bottom: 17%;
   width: clamp(52px, 7.2vw, 68px);
   max-width: none;
   height: auto;
