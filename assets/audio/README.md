@@ -4,7 +4,7 @@ All files in this folder are generated local placeholder assets and can be repla
 
 - `music/lounge-loop.wav`: looping background music.
 - `sfx/*.wav`: short, bright interaction and state sound effects.
-- `voice/*.wav`: original NPC prompt voice lines generated with gentle, elegant pacing and pauses. They are not modeled on any real person.
+- `voice/*.wav`: placeholder NPC prompt voice lines. NPC voice playback is currently disabled in code and these files are kept for later replacement.
 
 The in-game audio toggle saves the player preference in local storage.
 

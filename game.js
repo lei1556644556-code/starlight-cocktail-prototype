@@ -29,6 +29,7 @@ const RESULTS_TABLE = "starlight_game_results";
 const REMOTE_SYNC_INTERVAL = 4200;
 const AUDIO_ROOT = "assets/audio";
 const AUDIO_PREF_KEY = "starlight-cocktail-audio-v1";
+const NPC_VOICE_ENABLED = false;
 
 const sfxMap = {
   "拿起托盘": "pickup.wav",
@@ -326,6 +327,7 @@ function playSfx(name) {
 }
 
 function playNpcVoice(key) {
+  if (!NPC_VOICE_ENABLED) return false;
   if (!state.audioEnabled) return false;
   const file = voiceMap[key];
   if (file) return playAudioFile(`${AUDIO_ROOT}/voice/${file}`, 0.88);
