@@ -1282,11 +1282,9 @@ function makeClusterMergeAction(component) {
   if (colorStats.length === 0) return null;
 
   const usedReceivers = new Set();
-  if (colorStats.length <= component.length) {
-    colorStats
-      .filter((stat) => stat.trayIndexes.length === 1)
-      .forEach((stat) => usedReceivers.add(stat.trayIndexes[0]));
-  }
+  colorStats
+    .filter((stat) => stat.trayIndexes.length === 1)
+    .forEach((stat) => usedReceivers.add(stat.trayIndexes[0]));
   const transfers = [];
   const targets = [];
   colorStats.forEach((stat) => {
