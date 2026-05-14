@@ -1161,6 +1161,7 @@ async function resolveBoard(centerIndex) {
   let guard = 0;
   const seenStates = new Set();
   const pairMergeHistory = new Set();
+  const settleScope = createSettleScope(centerIndex);
   while (changed && guard < 28) {
     const signature = boardSignature();
     if (seenStates.has(signature)) {
@@ -1170,10 +1171,11 @@ async function resolveBoard(centerIndex) {
     seenStates.add(signature);
     changed = false;
     guard += 1;
-    const clusterAction = findClusterMerge(centerIndex);
+    const clusterAction = findClusterMerge(centerIndex, settleScope);
     if (clusterAction) {
       await playMerge(clusterAction);
       applyMerge(clusterAction);
+      expandSettleScope(clusterAction, settleScope);
       changed = true;
       clearEmptyTrays();
       render();
@@ -1190,6 +1192,7 @@ async function resolveBoard(centerIndex) {
       if (!action) continue;
       await playMerge(action);
       applyMerge(action);
+      expandSettleScope(action, settleScope);
       rememberPairMerge(action, pairMergeHistory);
       changed = true;
       clearEmptyTrays();
@@ -1242,10 +1245,34 @@ function findMergeAround(index, pairMergeHistory = new Set()) {
   return null;
 }
 
-function findClusterMerge(centerIndex) {
+function createSettleScope(centerIndex) {
   const component = occupiedComponentFrom(centerIndex);
+  const groupsByDrink = new Map();
+  drinkTypes.forEach((drink) => {
+    const groups = colorComponents(component, drink.id)
+      .filter((group) => group.length > 0)
+      .map((group) => new Set(group));
+    if (groups.length > 0) groupsByDrink.set(drink.id, groups);
+  });
+  return { component, groupsByDrink };
+}
+
+function expandSettleScope(action, settleScope) {
+  if (!settleScope) return;
+  const transfers = action.transfers || [action];
+  transfers.forEach((transfer) => {
+    const groups = settleScope.groupsByDrink.get(transfer.drinkId);
+    const group = groups?.find((item) => item.has(transfer.donorIndex) || item.has(transfer.receiverIndex));
+    if (!group) return;
+    group.add(transfer.donorIndex);
+    group.add(transfer.receiverIndex);
+  });
+}
+
+function findClusterMerge(centerIndex, settleScope = null) {
+  const component = (settleScope?.component || occupiedComponentFrom(centerIndex)).filter((index) => state.board[index]);
   if (component.length < 3) return null;
-  return makeClusterMergeAction(component);
+  return makeClusterMergeAction(component, settleScope);
 }
 
 function occupiedComponentFrom(startIndex) {
@@ -1266,9 +1293,9 @@ function occupiedComponentFrom(startIndex) {
   return component;
 }
 
-function makeClusterMergeAction(component) {
+function makeClusterMergeAction(component, settleScope = null) {
   const allColorStats = drinkTypes
-    .flatMap((drink) => colorComponents(component, drink.id).map((trayIndexes) => {
+    .flatMap((drink) => colorComponents(component, drink.id, settleScope).map((trayIndexes) => {
       const total = trayIndexes.reduce((sum, index) => sum + countDrink(state.board[index], drink.id), 0);
       return { drinkId: drink.id, trayIndexes, total, level: drinkLevel(drink) };
     }))
@@ -1311,7 +1338,14 @@ function makeClusterMergeAction(component) {
   return { type: "cluster", component, transfers, targets };
 }
 
-function colorComponents(component, drinkId) {
+function colorComponents(component, drinkId, settleScope = null) {
+  const scopedGroups = settleScope?.groupsByDrink.get(drinkId);
+  if (scopedGroups) {
+    const componentSet = new Set(component);
+    return scopedGroups
+      .map((group) => [...group].filter((index) => componentSet.has(index) && state.board[index]?.includes(drinkId)))
+      .filter((group) => group.length > 0);
+  }
   const allowed = new Set(component.filter((index) => state.board[index]?.includes(drinkId)));
   const visited = new Set();
   const groups = [];
