@@ -1253,7 +1253,7 @@ function makeClusterMergeAction(component) {
     const receiverIndex = chooseClusterReceiver(stat, usedReceivers);
     if (receiverIndex === null) return;
     usedReceivers.add(receiverIndex);
-    targets.push({ drinkId: stat.drinkId, receiverIndex, total: stat.total });
+    targets.push({ drinkId: stat.drinkId, receiverIndex, trayIndexes: stat.trayIndexes, total: stat.total });
     stat.trayIndexes.forEach((donorIndex) => {
       if (donorIndex === receiverIndex) return;
       const amount = countDrink(state.board[donorIndex], stat.drinkId);
@@ -1367,21 +1367,26 @@ function applyMerge(action) {
 }
 
 function applyClusterMerge(action) {
-  const targetByDrink = new Map(action.targets.map((target) => [target.drinkId, target.receiverIndex]));
-  const grouped = new Map(action.targets.map((target) => [target.drinkId, []]));
+  const grouped = new Map(action.targets.map((target, targetIndex) => [targetIndex, []]));
   const leftovers = [];
   action.component.forEach((index) => {
     const tray = state.board[index] || [];
     tray.forEach((drinkId) => {
-      if (targetByDrink.has(drinkId)) grouped.get(drinkId).push(drinkId);
-      else leftovers.push({ origin: index, drinkId });
+      const targetIndex = action.targets.findIndex((target) => {
+        return target.drinkId === drinkId && target.trayIndexes.includes(index);
+      });
+      if (targetIndex >= 0) {
+        grouped.get(targetIndex).push(drinkId);
+        return;
+      }
+      leftovers.push({ origin: index, drinkId });
     });
     state.board[index] = [];
   });
 
-  action.targets.forEach((target) => {
+  action.targets.forEach((target, targetIndex) => {
     const tray = state.board[target.receiverIndex] || [];
-    const cups = grouped.get(target.drinkId) || [];
+    const cups = grouped.get(targetIndex) || [];
     while (cups.length && tray.length < TRAY_CAPACITY) tray.push(cups.shift());
     state.board[target.receiverIndex] = tray;
     cups.forEach((drinkId) => leftovers.push({ origin: target.receiverIndex, drinkId }));
