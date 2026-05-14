@@ -1171,6 +1171,19 @@ async function resolveBoard(centerIndex) {
     seenStates.add(signature);
     changed = false;
     guard += 1;
+    const fullColorAction = findFullColorClear(settleScope);
+    if (fullColorAction) {
+      await playFullColorClear(fullColorAction);
+      applyFullColorClear(fullColorAction);
+      changed = true;
+      clearEmptyTrays();
+      render();
+      await checkLevelUp();
+      scheduleGameSave();
+      void syncGameSnapshot();
+      await wait(160);
+      continue;
+    }
     const clusterAction = findClusterMerge(centerIndex, settleScope);
     if (clusterAction) {
       await playMerge(clusterAction);
@@ -1338,6 +1351,25 @@ function makeClusterMergeAction(component, settleScope = null) {
   return { type: "cluster", component, transfers, targets };
 }
 
+function findFullColorClear(settleScope) {
+  if (!settleScope) return null;
+  const candidates = [];
+  drinkTypes.forEach((drink) => {
+    const groups = settleScope.groupsByDrink.get(drink.id) || [];
+    groups.forEach((group) => {
+      const trayIndexes = [...group].filter((index) => state.board[index]?.includes(drink.id));
+      if (trayIndexes.length < 2) return;
+      const total = trayIndexes.reduce((sum, index) => sum + countDrink(state.board[index], drink.id), 0);
+      if (total < TRAY_CAPACITY) return;
+      const centerIndex = trayIndexes
+        .map((index) => ({ index, count: countDrink(state.board[index], drink.id), clutter: state.board[index].length - countDrink(state.board[index], drink.id) }))
+        .sort((a, b) => b.count - a.count || a.clutter - b.clutter || a.index - b.index)[0].index;
+      candidates.push({ type: "fullColor", drinkId: drink.id, drink, trayIndexes, centerIndex, total, level: drinkLevel(drink) });
+    });
+  });
+  return candidates.sort((a, b) => b.level - a.level || b.total - a.total || a.centerIndex - b.centerIndex)[0] || null;
+}
+
 function colorComponents(component, drinkId, settleScope = null) {
   const scopedGroups = settleScope?.groupsByDrink.get(drinkId);
   if (scopedGroups) {
@@ -1496,6 +1528,40 @@ function applyClusterMerge(action) {
     while (cups.length && tray.length < TRAY_CAPACITY) tray.push(cups.shift());
     state.board[target.receiverIndex] = tray;
   });
+}
+
+async function playFullColorClear(action) {
+  flashSlots(action.trayIndexes);
+  setMessage(`${action.drink.name}集齐 6 杯，优先完成满盘！`);
+  playCue(state.combo > 1 ? `连击 x${state.combo + 1}` : "满盘");
+  await wait(160);
+  burstAtSlot(action.centerIndex);
+  floatTextAtSlot(action.centerIndex, "满盘");
+  await wait(420);
+}
+
+function applyFullColorClear(action) {
+  let remaining = TRAY_CAPACITY;
+  action.trayIndexes
+    .map((index) => ({ index, count: countDrink(state.board[index], action.drinkId) }))
+    .sort((a, b) => b.count - a.count || a.index - b.index)
+    .forEach(({ index }) => {
+      const tray = state.board[index] || [];
+      for (let i = tray.length - 1; i >= 0 && remaining > 0; i -= 1) {
+        if (tray[i] !== action.drinkId) continue;
+        tray.splice(i, 1);
+        remaining -= 1;
+      }
+    });
+  const gained = Math.round(action.drink.base * (1 + state.combo * 0.18));
+  state.combo += 1;
+  state.bestCombo = Math.max(state.bestCombo, state.combo);
+  state.fullCount += 1;
+  state.score += gained;
+  state.coin += Math.ceil(gained / 10);
+  state.challengeCards += Math.max(1, drinkLevel(action.drink));
+  state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(action.drink));
+  markProgressChanged();
 }
 
 async function collectFullTrays() {
