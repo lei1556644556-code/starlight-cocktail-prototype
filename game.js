@@ -1501,11 +1501,44 @@ async function checkLevelUp() {
     floatTextNearHeader(`达成 Lv.${state.level}`);
     await wait(1200);
   }
+  await animateRetiredDrinks();
   const retired = purgeRetiredDrinks();
   setMessage(retired > 0 ? `高阶调制已开启，${retired} 个低级酒杯已退场。` : `解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
   render();
   floatTextNearHeader(retired > 0 ? "低级酒杯退场" : `解锁 Lv.${state.level}`);
   await wait(720);
+}
+
+async function animateRetiredDrinks() {
+  const boardIndexes = state.board
+    .map((tray, index) => (hasRetiredDrink(tray) ? index : null))
+    .filter((index) => index !== null);
+  const queueIndexes = state.queue
+    .map((tray, index) => (hasRetiredDrink(tray) ? index : null))
+    .filter((index) => index !== null);
+  if (boardIndexes.length === 0 && queueIndexes.length === 0) return;
+  flashSlots(boardIndexes);
+  boardIndexes.forEach((index) => {
+    burstAtSlot(index);
+    floatTextAtSlot(index, "退场");
+  });
+  const retiringTrays = [
+    ...boardIndexes.map((index) => slotEl(index)?.querySelector(".tray")).filter(Boolean),
+    ...queueIndexes.map((index) => els.queue.querySelector(`.tray[data-queue-index="${index}"]`)).filter(Boolean),
+  ];
+  retiringTrays.forEach((tray) => tray.classList.add("retiring"));
+  playCue("升级");
+  await wait(780);
+  retiringTrays.forEach((tray) => tray.classList.remove("retiring"));
+}
+
+function hasRetiredDrink(tray) {
+  if (!tray) return false;
+  const minimumLevel = minimumDrinkLevel();
+  return tray.some((id) => {
+    const drink = findDrink(id);
+    return drink && drinkLevel(drink) < minimumLevel;
+  });
 }
 
 function purgeRetiredDrinks() {
