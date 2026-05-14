@@ -1157,7 +1157,7 @@ async function useTrash(index) {
 async function resolveBoard(centerIndex) {
   let changed = true;
   let guard = 0;
-  while (changed && guard < 14) {
+  while (changed && guard < 80) {
     changed = false;
     guard += 1;
     if (await collectFullTrays()) {
@@ -1174,7 +1174,7 @@ async function resolveBoard(centerIndex) {
       await wait(160);
       continue;
     }
-    for (const index of mergeOrder(centerIndex)) {
+    for (const index of mergeScanOrder(centerIndex)) {
       if (!state.board[index]) continue;
       const action = findMergeAround(index);
       if (!action) continue;
@@ -1188,6 +1188,18 @@ async function resolveBoard(centerIndex) {
     }
   }
   await collectFullTrays();
+}
+
+function mergeScanOrder(centerIndex) {
+  const component = occupiedComponentFrom(centerIndex);
+  if (component.length === 0) return mergeOrder(centerIndex);
+  const centerRow = Math.floor(centerIndex / COLS);
+  const centerCol = centerIndex % COLS;
+  return component.sort((a, b) => {
+    const aDistance = Math.abs(Math.floor(a / COLS) - centerRow) + Math.abs((a % COLS) - centerCol);
+    const bDistance = Math.abs(Math.floor(b / COLS) - centerRow) + Math.abs((b % COLS) - centerCol);
+    return aDistance - bDistance || a - b;
+  });
 }
 
 function mergeOrder(index) {
@@ -1310,27 +1322,31 @@ function makeMergeAction(firstIndex, secondIndex) {
   const shared = [...new Set(first)].filter((drinkId) => second.includes(drinkId));
   if (shared.length === 0) return null;
 
-  let receiverIndex = firstIndex;
-  let donorIndex = secondIndex;
-  const firstKinds = new Set(first).size;
-  const secondKinds = new Set(second).size;
-  if (firstKinds > secondKinds) {
-    receiverIndex = secondIndex;
-    donorIndex = firstIndex;
-  } else if (firstKinds === secondKinds) {
-    const drinkId = shared[0];
-    if (countDrink(first, drinkId) < countDrink(second, drinkId)) {
-      receiverIndex = secondIndex;
-      donorIndex = firstIndex;
-    }
-  }
+  const candidates = [];
+  shared.forEach((drinkId) => {
+    candidates.push(makeDirectionalMergeCandidate(firstIndex, secondIndex, drinkId));
+    candidates.push(makeDirectionalMergeCandidate(secondIndex, firstIndex, drinkId));
+  });
+  return candidates
+    .filter(Boolean)
+    .sort((a, b) => b.priority - a.priority || b.amount - a.amount || b.receiverCount - a.receiverCount)[0] || null;
+}
 
+function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId) {
   const receiver = state.board[receiverIndex];
   const donor = state.board[donorIndex];
-  const drinkId = shared.find((id) => receiver.includes(id) && donor.includes(id));
-  if (!drinkId) return null;
-  const amount = Math.min(TRAY_CAPACITY - receiver.length, countDrink(donor, drinkId));
-  return amount > 0 ? { receiverIndex, donorIndex, drinkId, amount } : null;
+  const space = TRAY_CAPACITY - receiver.length;
+  if (!receiver || !donor || space <= 0) return null;
+  const donorCount = countDrink(donor, drinkId);
+  const receiverCount = countDrink(receiver, drinkId);
+  if (donorCount <= 0 || receiverCount <= 0) return null;
+  const amount = Math.min(space, donorCount);
+  if (amount <= 0) return null;
+  const willComplete = receiverCount + amount >= TRAY_CAPACITY ? 1 : 0;
+  const receiverPurity = receiver.length > 0 ? receiverCount / receiver.length : 0;
+  const dominance = receiverCount - donorCount;
+  const priority = willComplete * 1000 + dominance * 120 + receiverCount * 30 + amount * 10 + receiverPurity;
+  return { receiverIndex, donorIndex, drinkId, amount, receiverCount, priority };
 }
 
 async function playMerge(action) {
