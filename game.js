@@ -1213,39 +1213,27 @@ function findMergeAround(index) {
 }
 
 function findClusterMerge(centerIndex) {
-  const components = occupiedComponents(centerIndex);
-  for (const component of components) {
-    if (component.length < 3) continue;
-    const action = makeClusterMergeAction(component);
-    if (action) return action;
-  }
-  return null;
+  const component = occupiedComponentFrom(centerIndex);
+  if (component.length < 3) return null;
+  return makeClusterMergeAction(component);
 }
 
-function occupiedComponents(preferredIndex) {
+function occupiedComponentFrom(startIndex) {
+  if (!state.board[startIndex]) return [];
   const visited = new Set();
-  const components = [];
-  for (let index = 0; index < state.board.length; index += 1) {
-    if (!state.board[index] || visited.has(index)) continue;
-    const stack = [index];
-    const component = [];
-    visited.add(index);
-    while (stack.length) {
-      const current = stack.pop();
-      component.push(current);
-      mergeOrder(current).slice(1).forEach((neighbor) => {
-        if (!state.board[neighbor] || visited.has(neighbor)) return;
-        visited.add(neighbor);
-        stack.push(neighbor);
-      });
-    }
-    components.push(component);
+  const stack = [startIndex];
+  const component = [];
+  visited.add(startIndex);
+  while (stack.length) {
+    const current = stack.pop();
+    component.push(current);
+    mergeOrder(current).slice(1).forEach((neighbor) => {
+      if (!state.board[neighbor] || visited.has(neighbor)) return;
+      visited.add(neighbor);
+      stack.push(neighbor);
+    });
   }
-  return components.sort((a, b) => {
-    const aPreferred = a.includes(preferredIndex) ? 1 : 0;
-    const bPreferred = b.includes(preferredIndex) ? 1 : 0;
-    return bPreferred - aPreferred || b.length - a.length;
-  });
+  return component;
 }
 
 function makeClusterMergeAction(component) {
