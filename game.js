@@ -1413,9 +1413,19 @@ function makeDirectionalMergeCandidate(receiverIndex, donorIndex, drinkId, pairM
   const amount = Math.min(space, donorCount);
   if (amount <= 0) return null;
   const willComplete = receiverCount + amount >= TRAY_CAPACITY ? 1 : 0;
+  const receiverClutter = receiver.length - receiverCount;
+  const donorClutter = donor.length - donorCount;
+  const pureReceiver = receiverClutter === 0 && donorClutter > 0 ? 1 : 0;
   const receiverPurity = receiver.length > 0 ? receiverCount / receiver.length : 0;
   const dominance = receiverCount - donorCount;
-  const priority = willComplete * 1000 + dominance * 120 + receiverCount * 30 + amount * 10 + receiverPurity;
+  const priority = willComplete * 1000
+    + pureReceiver * 650
+    + receiverPurity * 240
+    + dominance * 80
+    + receiverCount * 30
+    + amount * 10
+    + donorClutter * 20
+    - receiverClutter * 80;
   return { receiverIndex, donorIndex, drinkId, amount, receiverCount, priority };
 }
 
