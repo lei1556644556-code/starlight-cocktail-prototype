@@ -1267,12 +1267,17 @@ function occupiedComponentFrom(startIndex) {
 }
 
 function makeClusterMergeAction(component) {
-  const colorStats = drinkTypes
+  const allColorStats = drinkTypes
     .flatMap((drink) => colorComponents(component, drink.id).map((trayIndexes) => {
       const total = trayIndexes.reduce((sum, index) => sum + countDrink(state.board[index], drink.id), 0);
       return { drinkId: drink.id, trayIndexes, total, level: drinkLevel(drink) };
     }))
-    .filter((stat) => stat.trayIndexes.length >= 3 && stat.total > 1)
+    .filter((stat) => stat.total > 0);
+  const hasThreeTrayColor = allColorStats.some((stat) => stat.trayIndexes.length >= 3 && stat.total > 1);
+  const hasMixedTray = component.some((index) => new Set(state.board[index] || []).size > 1);
+  if (!hasThreeTrayColor && !(component.length >= 3 && allColorStats.length >= 2 && hasMixedTray)) return null;
+
+  const colorStats = allColorStats
     .sort((a, b) => Number(b.total >= TRAY_CAPACITY) - Number(a.total >= TRAY_CAPACITY) || b.total - a.total || b.level - a.level);
   if (colorStats.length === 0) return null;
 
@@ -1414,20 +1419,15 @@ function applyMerge(action) {
 
 function applyClusterMerge(action) {
   const grouped = new Map(action.targets.map((target, targetIndex) => [targetIndex, []]));
-  const leftovers = [];
-  action.component.forEach((index) => {
-    const tray = state.board[index] || [];
-    tray.forEach((drinkId) => {
-      const targetIndex = action.targets.findIndex((target) => {
-        return target.drinkId === drinkId && target.trayIndexes.includes(index);
-      });
-      if (targetIndex >= 0) {
-        grouped.get(targetIndex).push(drinkId);
-        return;
+  action.targets.forEach((target, targetIndex) => {
+    target.trayIndexes.forEach((index) => {
+      if (index === target.receiverIndex) return;
+      const tray = state.board[index] || [];
+      for (let i = tray.length - 1; i >= 0; i -= 1) {
+        if (tray[i] !== target.drinkId) continue;
+        grouped.get(targetIndex).push(tray.splice(i, 1)[0]);
       }
-      leftovers.push({ origin: index, drinkId });
     });
-    state.board[index] = [];
   });
 
   action.targets.forEach((target, targetIndex) => {
@@ -1435,14 +1435,6 @@ function applyClusterMerge(action) {
     const cups = grouped.get(targetIndex) || [];
     while (cups.length && tray.length < TRAY_CAPACITY) tray.push(cups.shift());
     state.board[target.receiverIndex] = tray;
-    cups.forEach((drinkId) => leftovers.push({ origin: target.receiverIndex, drinkId }));
-  });
-
-  leftovers.forEach(({ origin, drinkId }) => {
-    const preferred = state.board[origin] && state.board[origin].length < TRAY_CAPACITY ? origin : null;
-    const fallback = action.component.find((index) => (state.board[index] || []).length < TRAY_CAPACITY);
-    const target = preferred ?? fallback;
-    if (target !== undefined) state.board[target].push(drinkId);
   });
 }
 

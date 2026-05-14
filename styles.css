@@ -493,6 +493,8 @@ h1 {
 }
 
 .tool-bar {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -551,13 +553,15 @@ h1 {
 }
 
 .play-area {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto;
   align-content: start;
   gap: 8px;
   margin-top: 0;
-  padding: 10px;
+  padding: 18px 10px 10px;
   border-width: 0;
   border-radius: 0;
   background:
@@ -566,6 +570,8 @@ h1 {
 }
 
 .board {
+  position: relative;
+  z-index: 3;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
@@ -581,6 +587,7 @@ h1 {
 }
 
 .slot {
+  z-index: 1;
   display: grid;
   place-items: center;
   aspect-ratio: 1.55 / 1;
@@ -656,7 +663,7 @@ h1 {
 
 .tray {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   width: 100%;
   aspect-ratio: 1.55 / 1;
   min-height: unset;
