@@ -947,7 +947,7 @@ h1 {
   max-width: none;
   height: auto;
   object-fit: contain;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--cup-anchor-x, 0%)));
   pointer-events: none;
   user-select: none;
 }

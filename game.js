@@ -15,6 +15,23 @@ const drinkTypes = [
   { id: "level14", name: "星冠", icon: "assets/drinks/level-14.png", base: 6400, unlock: 13 },
 ];
 
+const cupAnchorX = {
+  level01: "-5.3%",
+  level02: "-15.1%",
+  level03: "-7.6%",
+  level04: "-1.0%",
+  level05: "2.9%",
+  level06: "2.1%",
+  level07: "3.1%",
+  level08: "2.9%",
+  level09: "-2.5%",
+  level10: "-3.2%",
+  level11: "-0.2%",
+  level12: "2.3%",
+  level13: "-1.6%",
+  level14: "3.1%",
+};
+
 const ROWS = 4;
 const COLS = 4;
 const TRAY_CAPACITY = 6;
@@ -886,6 +903,7 @@ function createTray(cups) {
       image.className = "cup-img";
       image.src = drink.icon;
       image.alt = "";
+      image.style.setProperty("--cup-anchor-x", cupAnchorX[drink.id] || "0%");
       cup.dataset.drinkId = drink.id;
       cup.appendChild(image);
       cup.setAttribute("aria-label", drink.name);
