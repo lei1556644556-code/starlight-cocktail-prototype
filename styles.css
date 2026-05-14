@@ -688,7 +688,7 @@ h1 {
 }
 
 .queue .cup-img {
-  width: clamp(28px, 4.2vw, 36px);
+  width: clamp(32px, 4.8vw, 42px);
 }
 
 .queue .tray:active {
@@ -742,8 +742,8 @@ h1 {
 .cup {
   position: relative;
   position: absolute;
-  width: 27%;
-  height: 38%;
+  width: 30%;
+  height: 44%;
   min-height: 0;
   border-radius: 8px;
   font-size: 0;
@@ -752,33 +752,33 @@ h1 {
 }
 
 .cup[data-position="1"] {
-  left: 4%;
-  top: 2%;
+  left: 2%;
+  top: -5%;
 }
 
 .cup[data-position="2"] {
-  left: 36.5%;
-  top: 2%;
+  left: 35%;
+  top: -5%;
 }
 
 .cup[data-position="3"] {
-  left: 69%;
-  top: 2%;
+  left: 68%;
+  top: -5%;
 }
 
 .cup[data-position="4"] {
-  left: 4%;
-  top: 58%;
+  left: 2%;
+  top: 51%;
 }
 
 .cup[data-position="5"] {
-  left: 36.5%;
-  top: 58%;
+  left: 35%;
+  top: 51%;
 }
 
 .cup[data-position="6"] {
-  left: 69%;
-  top: 58%;
+  left: 68%;
+  top: 51%;
 }
 
 .cup::before {
@@ -798,8 +798,8 @@ h1 {
   z-index: 1;
   position: absolute;
   left: 50%;
-  bottom: 12%;
-  width: clamp(44px, 5.8vw, 56px);
+  bottom: 2%;
+  width: clamp(52px, 7.2vw, 68px);
   max-width: none;
   height: auto;
   object-fit: contain;
@@ -1407,7 +1407,7 @@ h1 {
   }
 
   .cup-img {
-    width: clamp(36px, 8vw, 46px);
+    width: clamp(44px, 9.5vw, 58px);
   }
 
   .drink-dex-bar {
@@ -1558,7 +1558,7 @@ h1 {
   }
 
   .cup-img {
-    width: clamp(32px, 9.8vw, 40px);
+    width: clamp(38px, 12vw, 50px);
   }
 
   .queue {
@@ -1590,7 +1590,7 @@ h1 {
   }
 
   .queue .cup-img {
-    width: 26px;
+    width: 29px;
   }
 
   .floating-drag {
