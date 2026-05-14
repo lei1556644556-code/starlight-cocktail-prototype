@@ -1287,13 +1287,22 @@ function makeClusterMergeAction(component) {
   colorStats.forEach((stat) => {
     const receiverIndex = chooseClusterReceiver(stat, usedReceivers);
     if (receiverIndex === null) return;
+    const receiver = state.board[receiverIndex] || [];
+    let needed = Math.min(TRAY_CAPACITY - receiver.length, Math.max(0, stat.total - countDrink(receiver, stat.drinkId)));
+    if (needed <= 0) return;
     usedReceivers.add(receiverIndex);
-    targets.push({ drinkId: stat.drinkId, receiverIndex, trayIndexes: stat.trayIndexes, total: stat.total });
+    const targetTransfers = [];
     stat.trayIndexes.forEach((donorIndex) => {
       if (donorIndex === receiverIndex) return;
       const amount = countDrink(state.board[donorIndex], stat.drinkId);
-      if (amount > 0) transfers.push({ receiverIndex, donorIndex, drinkId: stat.drinkId, amount });
+      if (amount <= 0 || needed <= 0) return;
+      const moveAmount = Math.min(amount, needed);
+      targetTransfers.push({ receiverIndex, donorIndex, drinkId: stat.drinkId, amount: moveAmount });
+      needed -= moveAmount;
     });
+    if (targetTransfers.length === 0) return;
+    targets.push({ drinkId: stat.drinkId, receiverIndex, trayIndexes: stat.trayIndexes, total: stat.total });
+    transfers.push(...targetTransfers);
   });
   if (transfers.length === 0) return null;
   return { type: "cluster", component, transfers, targets };
@@ -1419,15 +1428,19 @@ function applyMerge(action) {
 
 function applyClusterMerge(action) {
   const grouped = new Map(action.targets.map((target, targetIndex) => [targetIndex, []]));
-  action.targets.forEach((target, targetIndex) => {
-    target.trayIndexes.forEach((index) => {
-      if (index === target.receiverIndex) return;
-      const tray = state.board[index] || [];
-      for (let i = tray.length - 1; i >= 0; i -= 1) {
-        if (tray[i] !== target.drinkId) continue;
-        grouped.get(targetIndex).push(tray.splice(i, 1)[0]);
-      }
-    });
+  const targetByDrinkAndReceiver = new Map(
+    action.targets.map((target, targetIndex) => [`${target.receiverIndex}-${target.drinkId}`, targetIndex])
+  );
+  action.transfers.forEach((transfer) => {
+    const targetIndex = targetByDrinkAndReceiver.get(`${transfer.receiverIndex}-${transfer.drinkId}`);
+    if (targetIndex === undefined) return;
+    const tray = state.board[transfer.donorIndex] || [];
+    let remaining = transfer.amount;
+    for (let i = tray.length - 1; i >= 0 && remaining > 0; i -= 1) {
+      if (tray[i] !== transfer.drinkId) continue;
+      grouped.get(targetIndex).push(tray.splice(i, 1)[0]);
+      remaining -= 1;
+    }
   });
 
   action.targets.forEach((target, targetIndex) => {
