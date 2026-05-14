@@ -808,12 +808,12 @@ h1 {
   width: min(132px, 62%);
   justify-self: center;
   cursor: grab;
-  overflow: hidden;
+  overflow: visible;
   transition: transform 0.18s ease, opacity 0.18s ease, filter 0.18s ease;
 }
 
 .queue .cups {
-  height: 100%;
+  height: auto;
   min-height: 0;
 }
 
@@ -941,8 +941,8 @@ h1 {
   position: relative;
   z-index: 1;
   position: absolute;
-  left: 54%;
-  bottom: 17%;
+  left: 52%;
+  bottom: -4%;
   width: clamp(52px, 7.2vw, 68px);
   max-width: none;
   height: auto;
