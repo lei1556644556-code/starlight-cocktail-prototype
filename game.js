@@ -1555,10 +1555,11 @@ async function playFullColorClear(action) {
   const flights = [];
   let flightIndex = 0;
   let remainingMoves = Math.max(0, TRAY_CAPACITY - countDrink(state.board[action.centerIndex], action.drinkId));
+  const plannedDonors = new Map(fullColorClearPlan(action).map((item) => [item.index, item.amount]));
   action.trayIndexes
     .filter((index) => index !== action.centerIndex)
     .forEach((donorIndex) => {
-      const amount = Math.min(countDrink(state.board[donorIndex], action.drinkId), remainingMoves);
+      const amount = Math.min(plannedDonors.get(donorIndex) || 0, remainingMoves);
       for (let i = 0; i < amount; i += 1) {
         flights.push(flyCup({ donorIndex, receiverIndex: action.centerIndex, drinkId: action.drinkId }, action.drink, i, flightIndex * 70));
         flightIndex += 1;
@@ -1574,17 +1575,16 @@ async function playFullColorClear(action) {
 
 function applyFullColorClear(action) {
   let remaining = TRAY_CAPACITY;
-  action.trayIndexes
-    .map((index) => ({ index, count: countDrink(state.board[index], action.drinkId) }))
-    .sort((a, b) => b.count - a.count || a.index - b.index)
-    .forEach(({ index }) => {
-      const tray = state.board[index] || [];
-      for (let i = tray.length - 1; i >= 0 && remaining > 0; i -= 1) {
-        if (tray[i] !== action.drinkId) continue;
-        tray.splice(i, 1);
-        remaining -= 1;
-      }
-    });
+  fullColorClearPlan(action).forEach(({ index, amount }) => {
+    const tray = state.board[index] || [];
+    let toRemove = amount;
+    for (let i = tray.length - 1; i >= 0 && toRemove > 0; i -= 1) {
+      if (tray[i] !== action.drinkId) continue;
+      tray.splice(i, 1);
+      toRemove -= 1;
+      remaining -= 1;
+    }
+  });
   const gained = Math.round(action.drink.base * (1 + state.combo * 0.18));
   state.combo += 1;
   state.bestCombo = Math.max(state.bestCombo, state.combo);
@@ -1594,6 +1594,40 @@ function applyFullColorClear(action) {
   state.challengeCards += Math.max(1, drinkLevel(action.drink));
   state.bestFullLevel = Math.max(state.bestFullLevel, drinkLevel(action.drink));
   markProgressChanged();
+}
+
+function fullColorClearPlan(action) {
+  const entries = action.trayIndexes
+    .map((index) => ({
+      index,
+      count: countDrink(state.board[index], action.drinkId),
+      clutter: (state.board[index]?.length || 0) - countDrink(state.board[index], action.drinkId),
+    }))
+    .filter((entry) => entry.count > 0);
+  const total = entries.reduce((sum, entry) => sum + entry.count, 0);
+  const keepCount = Math.max(0, total - TRAY_CAPACITY);
+  let protectedIndex = null;
+  let protectedLeft = 0;
+  if (keepCount > 0) {
+    const protectedEntry = entries
+      .filter((entry) => entry.count >= keepCount)
+      .sort((a, b) => a.count - b.count || a.clutter - b.clutter || a.index - b.index)[0]
+      || entries.sort((a, b) => b.count - a.count || a.clutter - b.clutter || a.index - b.index)[0];
+    protectedIndex = protectedEntry.index;
+    protectedLeft = Math.min(keepCount, protectedEntry.count);
+  }
+  let remaining = TRAY_CAPACITY;
+  return entries
+    .map((entry) => ({
+      ...entry,
+      removable: Math.max(0, entry.count - (entry.index === protectedIndex ? protectedLeft : 0)),
+    }))
+    .sort((a, b) => b.removable - a.removable || b.count - a.count || a.index - b.index)
+    .flatMap((entry) => {
+      const amount = Math.min(entry.removable, remaining);
+      remaining -= amount;
+      return amount > 0 ? [{ index: entry.index, amount }] : [];
+    });
 }
 
 async function collectFullTrays() {
