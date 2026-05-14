@@ -1282,15 +1282,20 @@ function makeClusterMergeAction(component) {
   if (colorStats.length === 0) return null;
 
   const usedReceivers = new Set();
+  if (colorStats.length <= component.length) {
+    colorStats
+      .filter((stat) => stat.trayIndexes.length === 1)
+      .forEach((stat) => usedReceivers.add(stat.trayIndexes[0]));
+  }
   const transfers = [];
   const targets = [];
   colorStats.forEach((stat) => {
     const receiverIndex = chooseClusterReceiver(stat, usedReceivers);
     if (receiverIndex === null) return;
+    usedReceivers.add(receiverIndex);
     const receiver = state.board[receiverIndex] || [];
     let needed = Math.min(TRAY_CAPACITY - receiver.length, Math.max(0, stat.total - countDrink(receiver, stat.drinkId)));
     if (needed <= 0) return;
-    usedReceivers.add(receiverIndex);
     const targetTransfers = [];
     stat.trayIndexes.forEach((donorIndex) => {
       if (donorIndex === receiverIndex) return;
