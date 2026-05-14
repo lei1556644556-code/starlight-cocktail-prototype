@@ -1238,11 +1238,10 @@ function occupiedComponentFrom(startIndex) {
 
 function makeClusterMergeAction(component) {
   const colorStats = drinkTypes
-    .map((drink) => {
-      const trayIndexes = component.filter((index) => state.board[index]?.includes(drink.id));
+    .flatMap((drink) => colorComponents(component, drink.id).map((trayIndexes) => {
       const total = trayIndexes.reduce((sum, index) => sum + countDrink(state.board[index], drink.id), 0);
       return { drinkId: drink.id, trayIndexes, total, level: drinkLevel(drink) };
-    })
+    }))
     .filter((stat) => stat.trayIndexes.length >= 3 && stat.total > 1)
     .sort((a, b) => Number(b.total >= TRAY_CAPACITY) - Number(a.total >= TRAY_CAPACITY) || b.total - a.total || b.level - a.level);
   if (colorStats.length === 0) return null;
@@ -1263,6 +1262,29 @@ function makeClusterMergeAction(component) {
   });
   if (transfers.length === 0) return null;
   return { type: "cluster", component, transfers, targets };
+}
+
+function colorComponents(component, drinkId) {
+  const allowed = new Set(component.filter((index) => state.board[index]?.includes(drinkId)));
+  const visited = new Set();
+  const groups = [];
+  allowed.forEach((startIndex) => {
+    if (visited.has(startIndex)) return;
+    const stack = [startIndex];
+    const group = [];
+    visited.add(startIndex);
+    while (stack.length) {
+      const current = stack.pop();
+      group.push(current);
+      mergeOrder(current).slice(1).forEach((neighbor) => {
+        if (!allowed.has(neighbor) || visited.has(neighbor)) return;
+        visited.add(neighbor);
+        stack.push(neighbor);
+      });
+    }
+    groups.push(group);
+  });
+  return groups;
 }
 
 function chooseClusterReceiver(stat, usedReceivers) {
