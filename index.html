@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>星光特调</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-rules-v1">
+    <link rel="stylesheet" href="styles.css?v=20260514-ui-v3">
   </head>
   <body>
     <section class="login-screen" id="loginScreen">
@@ -32,20 +32,20 @@
             <h1>Star Cocktail</h1>
           </div>
           <div class="currency-strip">
-            <button id="profileBtn" class="profile-chip" type="button">
+            <button id="profileBtn" class="profile-chip top-icon top-profile" type="button">
               <span id="playerNameLabel">游客</span>
             </button>
-            <button id="leaderboardBtn" class="icon-command" type="button" aria-label="排行榜">榜</button>
-            <button id="audioToggleBtn" class="icon-command audio-toggle" type="button" aria-label="关闭音效">♪</button>
+            <button id="leaderboardBtn" class="icon-command top-icon top-rank" type="button" aria-label="排行榜"></button>
+            <button id="audioToggleBtn" class="icon-command top-icon audio-toggle top-audio" type="button" aria-label="关闭音效"></button>
             <div class="hud-pill">
-              <span class="hud-icon">⚡</span>
+              <span class="hud-icon energy-icon"></span>
               <strong id="energy">50</strong>
             </div>
             <div class="hud-pill">
-              <span class="hud-icon">🍸</span>
+              <span class="hud-icon cocktail-icon"></span>
               <strong id="coin">0</strong>
             </div>
-            <button id="newGameBtn" class="icon-command" type="button" aria-label="新开一局">↻</button>
+            <button id="newGameBtn" class="icon-command top-icon top-refresh" type="button" aria-label="新开一局"></button>
           </div>
         </header>
 
@@ -167,6 +167,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="game.js?v=20260514-rules-v1"></script>
+    <script src="game.js?v=20260514-ui-v3"></script>
   </body>
 </html>

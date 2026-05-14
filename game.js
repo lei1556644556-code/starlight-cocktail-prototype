@@ -278,7 +278,7 @@ function saveAudioEnabled() {
 
 function renderAudioToggle() {
   if (!els.audioToggleBtn) return;
-  els.audioToggleBtn.textContent = state.audioEnabled ? "♪" : "×";
+  els.audioToggleBtn.textContent = "";
   els.audioToggleBtn.classList.toggle("off", !state.audioEnabled);
   els.audioToggleBtn.setAttribute("aria-label", state.audioEnabled ? "关闭音效" : "开启音效");
   els.audioToggleBtn.title = state.audioEnabled ? "关闭音效" : "开启音效";
