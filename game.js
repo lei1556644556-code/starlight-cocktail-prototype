@@ -441,6 +441,7 @@ function loadGameProgress() {
     state.queueFresh = false;
     state.resultSubmitted = false;
     state.cue = "待机";
+    purgeRetiredDrinks();
     return true;
   } catch {
     return false;
@@ -728,7 +729,12 @@ function startGame({ restore = false } = {}) {
 }
 
 function availableDrinks() {
-  return drinkTypes.filter((drink) => drink.unlock <= state.level);
+  const minimumLevel = minimumDrinkLevel();
+  return drinkTypes.filter((drink) => drink.unlock <= state.level && drinkLevel(drink) >= minimumLevel);
+}
+
+function minimumDrinkLevel(level = state.level) {
+  return Math.max(1, level - 5);
 }
 
 function randomDrink() {
@@ -1154,6 +1160,20 @@ async function resolveBoard(centerIndex) {
   while (changed && guard < 14) {
     changed = false;
     guard += 1;
+    if (await collectFullTrays()) {
+      changed = true;
+      continue;
+    }
+    const clusterAction = findClusterMerge(centerIndex);
+    if (clusterAction) {
+      await playMerge(clusterAction);
+      applyMerge(clusterAction);
+      changed = true;
+      clearEmptyTrays();
+      render();
+      await wait(160);
+      continue;
+    }
     for (const index of mergeOrder(centerIndex)) {
       if (!state.board[index]) continue;
       const action = findMergeAround(index);
@@ -1164,9 +1184,10 @@ async function resolveBoard(centerIndex) {
       clearEmptyTrays();
       render();
       await wait(160);
-      await collectFullTrays();
+      break;
     }
   }
+  await collectFullTrays();
 }
 
 function mergeOrder(index) {
@@ -1189,6 +1210,87 @@ function findMergeAround(index) {
     if (action && action.amount > 0) return action;
   }
   return null;
+}
+
+function findClusterMerge(centerIndex) {
+  const components = occupiedComponents(centerIndex);
+  for (const component of components) {
+    if (component.length < 3) continue;
+    const action = makeClusterMergeAction(component);
+    if (action) return action;
+  }
+  return null;
+}
+
+function occupiedComponents(preferredIndex) {
+  const visited = new Set();
+  const components = [];
+  for (let index = 0; index < state.board.length; index += 1) {
+    if (!state.board[index] || visited.has(index)) continue;
+    const stack = [index];
+    const component = [];
+    visited.add(index);
+    while (stack.length) {
+      const current = stack.pop();
+      component.push(current);
+      mergeOrder(current).slice(1).forEach((neighbor) => {
+        if (!state.board[neighbor] || visited.has(neighbor)) return;
+        visited.add(neighbor);
+        stack.push(neighbor);
+      });
+    }
+    components.push(component);
+  }
+  return components.sort((a, b) => {
+    const aPreferred = a.includes(preferredIndex) ? 1 : 0;
+    const bPreferred = b.includes(preferredIndex) ? 1 : 0;
+    return bPreferred - aPreferred || b.length - a.length;
+  });
+}
+
+function makeClusterMergeAction(component) {
+  const colorStats = drinkTypes
+    .map((drink) => {
+      const trayIndexes = component.filter((index) => state.board[index]?.includes(drink.id));
+      const total = trayIndexes.reduce((sum, index) => sum + countDrink(state.board[index], drink.id), 0);
+      return { drinkId: drink.id, trayIndexes, total, level: drinkLevel(drink) };
+    })
+    .filter((stat) => stat.trayIndexes.length >= 3 && stat.total > 1)
+    .sort((a, b) => Number(b.total >= TRAY_CAPACITY) - Number(a.total >= TRAY_CAPACITY) || b.total - a.total || b.level - a.level);
+  if (colorStats.length === 0) return null;
+
+  const usedReceivers = new Set();
+  const transfers = [];
+  const targets = [];
+  colorStats.forEach((stat) => {
+    const receiverIndex = chooseClusterReceiver(stat, usedReceivers);
+    if (receiverIndex === null) return;
+    usedReceivers.add(receiverIndex);
+    targets.push({ drinkId: stat.drinkId, receiverIndex, total: stat.total });
+    stat.trayIndexes.forEach((donorIndex) => {
+      if (donorIndex === receiverIndex) return;
+      const amount = countDrink(state.board[donorIndex], stat.drinkId);
+      if (amount > 0) transfers.push({ receiverIndex, donorIndex, drinkId: stat.drinkId, amount });
+    });
+  });
+  if (transfers.length === 0) return null;
+  return { type: "cluster", component, transfers, targets };
+}
+
+function chooseClusterReceiver(stat, usedReceivers) {
+  const ranked = stat.trayIndexes
+    .map((index) => {
+      const tray = state.board[index] || [];
+      const same = countDrink(tray, stat.drinkId);
+      return {
+        index,
+        same,
+        clutter: tray.length - same,
+        used: usedReceivers.has(index) ? 1 : 0,
+      };
+    })
+    .sort((a, b) => a.used - b.used || b.same - a.same || a.clutter - b.clutter || a.index - b.index);
+  return ranked[0]?.index ?? null;
 }
 
 function makeMergeAction(firstIndex, secondIndex) {
@@ -1222,25 +1324,65 @@ function makeMergeAction(firstIndex, secondIndex) {
 }
 
 async function playMerge(action) {
-  const drink = findDrink(action.drinkId);
-  flashSlots([action.receiverIndex, action.donorIndex]);
-  setMessage(`${drink.name}合并 x${action.amount}`);
+  const transfers = action.transfers || [action];
+  const firstDrink = findDrink(transfers[0].drinkId);
+  const slots = [...new Set(transfers.flatMap((transfer) => [transfer.receiverIndex, transfer.donorIndex]))];
+  flashSlots(slots);
+  setMessage(action.type === "cluster" ? `连在一起，${action.targets.length} 种酒杯自动归类` : `${firstDrink.name}合并 x${action.amount}`);
   playCue("合并");
   const flights = [];
-  for (let i = 0; i < action.amount; i += 1) {
-    flights.push(flyCup(action, drink, i, i * 100));
-  }
+  let flightIndex = 0;
+  transfers.forEach((transfer) => {
+    const drink = findDrink(transfer.drinkId);
+    for (let i = 0; i < transfer.amount; i += 1) {
+      flights.push(flyCup(transfer, drink, i, flightIndex * 70));
+      flightIndex += 1;
+    }
+  });
   await Promise.all(flights);
   await wait(120);
 }
 
 function applyMerge(action) {
+  if (action.type === "cluster") {
+    applyClusterMerge(action);
+    return;
+  }
   const receiver = state.board[action.receiverIndex];
   const donor = state.board[action.donorIndex];
   for (let i = 0; i < action.amount; i += 1) {
     receiver.push(action.drinkId);
     donor.splice(donor.indexOf(action.drinkId), 1);
   }
+}
+
+function applyClusterMerge(action) {
+  const targetByDrink = new Map(action.targets.map((target) => [target.drinkId, target.receiverIndex]));
+  const grouped = new Map(action.targets.map((target) => [target.drinkId, []]));
+  const leftovers = [];
+  action.component.forEach((index) => {
+    const tray = state.board[index] || [];
+    tray.forEach((drinkId) => {
+      if (targetByDrink.has(drinkId)) grouped.get(drinkId).push(drinkId);
+      else leftovers.push({ origin: index, drinkId });
+    });
+    state.board[index] = [];
+  });
+
+  action.targets.forEach((target) => {
+    const tray = state.board[target.receiverIndex] || [];
+    const cups = grouped.get(target.drinkId) || [];
+    while (cups.length && tray.length < TRAY_CAPACITY) tray.push(cups.shift());
+    state.board[target.receiverIndex] = tray;
+    cups.forEach((drinkId) => leftovers.push({ origin: target.receiverIndex, drinkId }));
+  });
+
+  leftovers.forEach(({ origin, drinkId }) => {
+    const preferred = state.board[origin] && state.board[origin].length < TRAY_CAPACITY ? origin : null;
+    const fallback = action.component.find((index) => (state.board[index] || []).length < TRAY_CAPACITY);
+    const target = preferred ?? fallback;
+    if (target !== undefined) state.board[target].push(drinkId);
+  });
 }
 
 async function collectFullTrays() {
@@ -1280,12 +1422,34 @@ async function checkLevelUp() {
   if (nextLevel === state.level || state.score < levelThresholds[nextLevel - 1]) return;
   state.level = nextLevel;
   state.lastUnlockedLevel = nextLevel;
+  const retired = purgeRetiredDrinks();
   playCue("升级");
-  setMessage(`解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
+  setMessage(retired > 0 ? `解锁 Lv.${state.level}，低级酒杯已退场 x${retired}。` : `解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
   playNpcVoice("levelUp");
   render();
   floatTextNearHeader(`解锁 Lv.${state.level}`);
   await wait(720);
+}
+
+function purgeRetiredDrinks() {
+  const minimumLevel = minimumDrinkLevel();
+  let removed = 0;
+  const keepActive = (tray) => {
+    if (!tray) return null;
+    const kept = tray.filter((id) => {
+      const drink = findDrink(id);
+      if (drink && drinkLevel(drink) < minimumLevel) {
+        removed += 1;
+        return false;
+      }
+      return true;
+    });
+    return kept.length ? kept : null;
+  };
+  state.board = state.board.map(keepActive);
+  state.queue = state.queue.map(keepActive);
+  if (removed > 0) markProgressChanged();
+  return removed;
 }
 
 function removeLowestDrink() {
@@ -1339,9 +1503,29 @@ function hasLegalMove() {
 
 function willMergeAt(index, tray) {
   if (!tray || state.board[index]) return false;
+  if (wouldClusterMergeAt(index, tray)) return true;
   return mergeOrder(index).slice(1).some((neighbor) => {
     const other = state.board[neighbor];
     return other && tray.some((id) => other.includes(id));
+  });
+}
+
+function wouldClusterMergeAt(index, tray) {
+  const connected = [index];
+  const seen = new Set([index]);
+  const stack = mergeOrder(index).slice(1).filter((neighbor) => state.board[neighbor]);
+  while (stack.length) {
+    const current = stack.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    connected.push(current);
+    mergeOrder(current).slice(1).forEach((neighbor) => {
+      if (!seen.has(neighbor) && state.board[neighbor]) stack.push(neighbor);
+    });
+  }
+  if (connected.length < 3) return false;
+  return [...new Set(tray)].some((drinkId) => {
+    return connected.filter((slot) => (slot === index ? tray : state.board[slot])?.includes(drinkId)).length >= 3;
   });
 }
 
