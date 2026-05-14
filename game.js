@@ -1491,12 +1491,20 @@ async function checkLevelUp() {
   if (nextLevel === state.level || state.score < levelThresholds[nextLevel - 1]) return;
   state.level = nextLevel;
   state.lastUnlockedLevel = nextLevel;
-  const retired = purgeRetiredDrinks();
   playCue("升级");
-  setMessage(retired > 0 ? `解锁 Lv.${state.level}，低级酒杯已退场 x${retired}。` : `解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
   playNpcVoice("levelUp");
+  const retiredLevel = minimumDrinkLevel() - 1;
+  if (retiredLevel > 0) {
+    const retiredText = retiredLevel === 1 ? "Lv.1 酒杯" : `Lv.${retiredLevel} 及以下低级酒杯`;
+    setMessage(`太棒了，达成 Lv.${state.level} 特调！这是很少见的高段成就。接下来不会再生成${retiredText}，场面上的也将全部退场。`);
+    render();
+    floatTextNearHeader(`达成 Lv.${state.level}`);
+    await wait(1200);
+  }
+  const retired = purgeRetiredDrinks();
+  setMessage(retired > 0 ? `高阶调制已开启，${retired} 个低级酒杯已退场。` : `解锁 Lv.${state.level} 美酒，新的酒杯会进入后续托盘。`);
   render();
-  floatTextNearHeader(`解锁 Lv.${state.level}`);
+  floatTextNearHeader(retired > 0 ? "低级酒杯退场" : `解锁 Lv.${state.level}`);
   await wait(720);
 }
 
