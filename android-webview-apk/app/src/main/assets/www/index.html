@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>星光特调</title>
+    <link rel="stylesheet" href="styles.css?v=20260514-full-clear-keep-v1">
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-top">
+        <span>星月巷陌1服</span>
+        <button id="loginHelpBtn" class="round-command" type="button" aria-label="帮助">?</button>
+      </div>
+      <div class="login-title">
+        <p>Starlight Cocktail</p>
+        <h2>星光特调</h2>
+      </div>
+      <div class="login-card">
+        <label for="loginNameInput">调酒师昵称</label>
+        <input id="loginNameInput" maxlength="16" autocomplete="nickname" placeholder="输入昵称">
+        <button id="guestLoginBtn" class="primary-action" type="button">游客进入</button>
+        <p id="loginStatus">游客身份会自动保存，之后可补绑手机号。</p>
+      </div>
+    </section>
+
+    <main class="app">
+      <section class="game-shell">
+        <header class="game-hud">
+          <div class="brand-lockup">
+            <p class="eyebrow">星光特调</p>
+            <h1>Star Cocktail</h1>
+          </div>
+          <div class="currency-strip">
+            <button id="profileBtn" class="profile-chip top-icon top-profile" type="button">
+              <span id="playerNameLabel">游客</span>
+            </button>
+            <button id="leaderboardBtn" class="icon-command top-icon top-rank" type="button" aria-label="排行榜"></button>
+            <button id="audioToggleBtn" class="icon-command top-icon audio-toggle top-audio" type="button" aria-label="关闭音效"></button>
+            <div class="hud-pill">
+              <span class="hud-icon energy-icon"></span>
+              <strong id="energy">50</strong>
+            </div>
+            <div class="hud-pill">
+              <span class="hud-icon cocktail-icon"></span>
+              <strong id="coin">0</strong>
+            </div>
+            <button id="newGameBtn" class="icon-command top-icon top-refresh" type="button" aria-label="新开一局"></button>
+          </div>
+        </header>
+
+        <section class="stage">
+          <div class="hostess-wrap">
+            <img class="hostess" src="assets/ui/hostess.png" alt="">
+          </div>
+          <div class="speech-card">
+            <div class="bubble" id="message">先把吧台的 3 个托盘放到桌面吧。</div>
+            <div class="progress-card">
+              <div class="progress-top">
+                <span>酣畅值</span>
+                <strong><span id="score">0</span>/<span id="scoreTarget">900</span></strong>
+              </div>
+              <div class="progress-bar"><span id="scoreFill"></span></div>
+              <div class="level-badge">Lv.<span id="level">1</span> 特调</div>
+            </div>
+          </div>
+          <div class="side-cards">
+            <div class="reward-card">
+              <span>本期累计获得</span>
+              <strong>挑战卡 x<span id="challengeCount">0</span></strong>
+            </div>
+            <div class="best-card">
+              <span>历史最高酣畅值</span>
+              <strong id="bestScore">0</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="tool-bar">
+          <div class="feedback">
+            <div class="combo" id="combo">连击 x0</div>
+            <div class="sound" id="soundCue">音效：待机</div>
+          </div>
+          <div class="tools">
+            <button id="trashBtn" class="tool-button" type="button">
+              <span class="tool-icon">♻</span>
+              <span>垃圾桶</span>
+              <strong id="trashCount">2</strong>
+            </button>
+            <button id="tongsBtn" class="tool-button" type="button">
+              <span class="tool-icon">⌁</span>
+              <span>夹子</span>
+              <strong id="tongsCount">2</strong>
+            </button>
+            <button id="endRunBtn" class="tool-button end-run hidden" type="button">
+              <span class="tool-icon">×</span>
+              <span>不用道具</span>
+              <strong>结算</strong>
+            </button>
+          </div>
+        </section>
+
+        <section class="play-area">
+          <div class="board" id="board" aria-label="酒桌"></div>
+          <div class="queue" id="queue" aria-label="吧台托盘"></div>
+        </section>
+
+        <section class="drink-dex-bar">
+          <button id="drinkDexBtn" class="drink-dex-button" type="button">
+            <img id="drinkDexIcon" class="drink-dex-icon" src="assets/drinks/level-01.png" alt="">
+            <span>当前最高</span>
+            <strong id="drinkDexLevel">Lv.1 蓝星</strong>
+          </button>
+        </section>
+      </section>
+    </main>
+
+    <div class="effects" id="effects"></div>
+
+    <div class="overlay hidden" id="overlay">
+      <div class="modal">
+        <h2 id="modalTitle">本局结束</h2>
+        <div class="modal-stats" id="modalText"></div>
+        <button id="modalBtn" type="button">再来一局</button>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="drinkDexPanel">
+      <div class="modal drink-dex-modal">
+        <div class="modal-head">
+          <h2>酒杯图鉴</h2>
+          <button id="drinkDexClose" class="icon-command" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="drink-dex-grid" id="drinkDexGrid"></div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="profilePanel">
+      <div class="modal form-modal">
+        <div class="modal-head">
+          <h2>玩家资料</h2>
+          <button id="profileClose" class="icon-command" type="button" aria-label="关闭">×</button>
+        </div>
+        <label for="profileNameInput">昵称</label>
+        <input id="profileNameInput" maxlength="16" autocomplete="nickname">
+        <label for="profilePhoneInput">手机号（选填）</label>
+        <input id="profilePhoneInput" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="之后绑定也可以">
+        <button id="saveProfileBtn" class="primary-action" type="button">保存资料</button>
+        <p class="network-status" id="profileStatus"></p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="leaderboardPanel">
+      <div class="modal leaderboard-modal">
+        <div class="modal-head">
+          <h2>排行榜</h2>
+          <button id="leaderboardClose" class="icon-command" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="rank-tabs">
+          <button id="scoreRankTab" class="active" type="button">最高分</button>
+          <button id="cupRankTab" type="button">最高酒杯</button>
+          <button id="recentRankTab" type="button">最近成绩</button>
+        </div>
+        <div class="leaderboard-list" id="leaderboardList"></div>
+        <p class="network-status" id="leaderboardStatus"></p>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="game.js?v=20260514-full-clear-keep-v1"></script>
+  </body>
+</html>
