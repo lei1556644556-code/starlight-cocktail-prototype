@@ -49,6 +49,16 @@ create table if not exists public.starlight_game_results (
   constraint starlight_game_results_best_cup_range check (best_cup_level between 1 and 14)
 );
 
+create table if not exists public.starlight_login_codes (
+  id bigint generated always as identity primary key,
+  code text not null unique,
+  player_id uuid not null references public.starlight_players(id) on delete cascade,
+  expires_at timestamptz not null,
+  claimed_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint starlight_login_codes_code_len check (code ~ '^[0-9]{6}$')
+);
+
 alter table public.starlight_game_results
   add column if not exists updated_at timestamptz not null default now();
 
@@ -57,6 +67,9 @@ create index if not exists starlight_game_results_score_rank_idx
 
 create index if not exists starlight_game_results_cup_rank_idx
   on public.starlight_game_results (best_cup_level desc, score desc, created_at desc);
+
+create index if not exists starlight_login_codes_lookup_idx
+  on public.starlight_login_codes (code, expires_at desc);
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -80,6 +93,7 @@ for each row execute function public.set_updated_at();
 
 alter table public.starlight_players enable row level security;
 alter table public.starlight_game_results enable row level security;
+alter table public.starlight_login_codes enable row level security;
 
 drop policy if exists "public read starlight players" on public.starlight_players;
 create policy "public read starlight players"
@@ -110,5 +124,21 @@ with check (true);
 drop policy if exists "public update starlight game results" on public.starlight_game_results;
 create policy "public update starlight game results"
 on public.starlight_game_results for update
+using (true)
+with check (true);
+
+drop policy if exists "public read starlight login codes" on public.starlight_login_codes;
+create policy "public read starlight login codes"
+on public.starlight_login_codes for select
+using (true);
+
+drop policy if exists "public insert starlight login codes" on public.starlight_login_codes;
+create policy "public insert starlight login codes"
+on public.starlight_login_codes for insert
+with check (true);
+
+drop policy if exists "public update starlight login codes" on public.starlight_login_codes;
+create policy "public update starlight login codes"
+on public.starlight_login_codes for update
 using (true)
 with check (true);

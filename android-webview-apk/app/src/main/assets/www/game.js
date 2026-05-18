@@ -43,6 +43,7 @@ const PROFILE_KEY = "starlight-cocktail-profile-v1";
 const SAVE_KEY = "starlight-cocktail-save-v1";
 const PLAYERS_TABLE = "starlight_players";
 const RESULTS_TABLE = "starlight_game_results";
+const LOGIN_CODES_TABLE = "starlight_login_codes";
 const REMOTE_SYNC_INTERVAL = 4200;
 const AUDIO_ROOT = "assets/audio";
 const AUDIO_PREF_KEY = "starlight-cocktail-audio-v1";
@@ -159,6 +160,10 @@ const els = {
   profileNameInput: document.querySelector("#profileNameInput"),
   profilePhoneInput: document.querySelector("#profilePhoneInput"),
   saveProfileBtn: document.querySelector("#saveProfileBtn"),
+  generateLoginCodeBtn: document.querySelector("#generateLoginCodeBtn"),
+  loginCodeDisplay: document.querySelector("#loginCodeDisplay"),
+  bindCodeInput: document.querySelector("#bindCodeInput"),
+  bindLoginCodeBtn: document.querySelector("#bindLoginCodeBtn"),
   profileStatus: document.querySelector("#profileStatus"),
   leaderboardPanel: document.querySelector("#leaderboardPanel"),
   leaderboardClose: document.querySelector("#leaderboardClose"),
@@ -275,6 +280,92 @@ async function syncProfile() {
 function setNetworkStatus(text) {
   if (els.loginStatus) els.loginStatus.textContent = text;
   if (els.profileStatus) els.profileStatus.textContent = text;
+}
+
+function makeLoginCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function generateLoginCode() {
+  if (!supabaseClient) {
+    els.profileStatus.textContent = "当前网络组件未加载，暂时不能生成登录码。";
+    return;
+  }
+  const synced = profile.playerId ? true : await syncProfile();
+  if (!synced || !profile.playerId) {
+    els.profileStatus.textContent = "请先保存并同步玩家资料，再生成登录码。";
+    return;
+  }
+  els.profileStatus.textContent = "正在生成登录码...";
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = makeLoginCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const { error } = await supabaseClient
+      .from(LOGIN_CODES_TABLE)
+      .insert({ code, player_id: profile.playerId, expires_at: expiresAt });
+    if (!error) {
+      els.loginCodeDisplay.textContent = code;
+      els.profileStatus.textContent = "登录码已生成，10 分钟内在另一台设备输入即可绑定。";
+      return;
+    }
+    if (error.code !== "23505") {
+      els.profileStatus.textContent = `登录码生成失败：${error.message}`;
+      return;
+    }
+  }
+  els.profileStatus.textContent = "登录码生成失败，请稍后再试。";
+}
+
+async function bindWithLoginCode() {
+  if (!supabaseClient) {
+    els.profileStatus.textContent = "当前网络组件未加载，暂时不能绑定登录码。";
+    return;
+  }
+  const code = (els.bindCodeInput.value || "").replace(/\D/g, "").slice(0, 6);
+  els.bindCodeInput.value = code;
+  if (code.length !== 6) {
+    els.profileStatus.textContent = "请输入 6 位登录码。";
+    return;
+  }
+  els.profileStatus.textContent = "正在绑定账号...";
+  const { data, error } = await supabaseClient
+    .from(LOGIN_CODES_TABLE)
+    .select("id, code, expires_at, claimed_at, player:starlight_players(id, guest_key, display_name, phone)")
+    .eq("code", code)
+    .maybeSingle();
+  if (error) {
+    els.profileStatus.textContent = `登录码查询失败：${error.message}`;
+    return;
+  }
+  if (!data || data.claimed_at || new Date(data.expires_at).getTime() < Date.now()) {
+    els.profileStatus.textContent = "登录码无效或已过期，请在原设备重新生成。";
+    return;
+  }
+  const player = data.player;
+  if (!player?.guest_key) {
+    els.profileStatus.textContent = "登录码对应账号异常，请重新生成。";
+    return;
+  }
+  profile.guestKey = player.guest_key;
+  profile.playerId = player.id;
+  profile.displayName = player.display_name || profile.displayName;
+  profile.phone = player.phone || "";
+  profile.hasEntered = true;
+  saveLocalProfile();
+  renderProfile();
+  const { error: updateError } = await supabaseClient
+    .from(LOGIN_CODES_TABLE)
+    .update({ claimed_at: new Date().toISOString() })
+    .eq("id", data.id);
+  if (updateError) {
+    els.profileStatus.textContent = `已绑定账号，但登录码状态更新失败：${updateError.message}`;
+  } else {
+    els.profileStatus.textContent = "绑定成功，当前设备已切换到同一个玩家账号。";
+  }
+  state.remoteResultId = null;
+  state.dirty = true;
+  saveGameProgress();
+  void syncGameSnapshot();
 }
 
 function loadAudioEnabled() {
@@ -2086,6 +2177,16 @@ els.saveProfileBtn.addEventListener("click", async () => {
   profile.hasEntered = true;
   els.profileStatus.textContent = "正在校验昵称...";
   await syncProfile();
+});
+els.generateLoginCodeBtn?.addEventListener("click", () => {
+  initAudio();
+  playSfx("ui-click.wav");
+  void generateLoginCode();
+});
+els.bindLoginCodeBtn?.addEventListener("click", () => {
+  initAudio();
+  playSfx("ui-click.wav");
+  void bindWithLoginCode();
 });
 
 els.leaderboardBtn.addEventListener("click", openLeaderboardPanel);

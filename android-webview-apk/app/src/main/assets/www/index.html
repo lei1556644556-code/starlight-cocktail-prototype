@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>星光特调</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-full-clear-keep-v1">
+    <link rel="stylesheet" href="styles.css?v=20260515-login-code-v1">
   </head>
   <body>
     <section class="login-screen" id="loginScreen">
@@ -146,6 +146,17 @@
         <label for="profilePhoneInput">手机号（选填）</label>
         <input id="profilePhoneInput" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="之后绑定也可以">
         <button id="saveProfileBtn" class="primary-action" type="button">保存资料</button>
+        <div class="bind-card">
+          <strong>多设备登录</strong>
+          <span>在原设备生成登录码，另一台设备输入后即可绑定同一个玩家账号。</span>
+          <button id="generateLoginCodeBtn" type="button">生成登录码</button>
+          <div class="login-code-display" id="loginCodeDisplay">------</div>
+          <label for="bindCodeInput">输入登录码</label>
+          <div class="bind-row">
+            <input id="bindCodeInput" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位数字">
+            <button id="bindLoginCodeBtn" type="button">绑定</button>
+          </div>
+        </div>
         <p class="network-status" id="profileStatus"></p>
       </div>
     </div>
@@ -167,6 +178,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="game.js?v=20260514-full-clear-keep-v1"></script>
+    <script src="game.js?v=20260515-login-code-v1"></script>
   </body>
 </html>
