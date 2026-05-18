@@ -44,6 +44,7 @@ const SAVE_KEY = "starlight-cocktail-save-v1";
 const PLAYERS_TABLE = "starlight_players";
 const RESULTS_TABLE = "starlight_game_results";
 const LOGIN_CODES_TABLE = "starlight_login_codes";
+const INVENTORY_TABLE = "starlight_player_inventory";
 const REMOTE_SYNC_INTERVAL = 4200;
 const AUDIO_ROOT = "assets/audio";
 const AUDIO_PREF_KEY = "starlight-cocktail-audio-v1";
@@ -568,9 +569,15 @@ function flushGameProgress() {
 
 async function syncGameSnapshot({ final = false } = {}) {
   if (!supabaseClient) {
-    setLeaderboardStatus("Supabase SDK 未加载，成绩暂未联网同步。");
+    setLeaderboardStatus("Supabase SDK not loaded; score sync is unavailable.");
     return;
   }
+  const synced = profile.playerId ? true : await syncProfile();
+  if (!synced || !profile.playerId) {
+    setLeaderboardStatus("Player profile is not synced yet.");
+    return;
+  }
+  await claimRemoteInventory();
   if (!state.dirty && !final && state.remoteResultId) return;
   const result = {
     score: state.score,
@@ -578,11 +585,6 @@ async function syncGameSnapshot({ final = false } = {}) {
     fullCount: state.fullCount,
     bestCombo: state.bestCombo,
   };
-  const synced = profile.playerId ? true : await syncProfile();
-  if (!synced || !profile.playerId) {
-    setLeaderboardStatus("玩家资料未同步，成绩暂未上传。");
-    return;
-  }
   const bestDrink = drinkTypes[Math.max(0, result.bestFullLevel - 1)] || drinkTypes[0];
   const payload = {
     player_id: profile.playerId,
@@ -597,7 +599,7 @@ async function syncGameSnapshot({ final = false } = {}) {
     : supabaseClient.from(RESULTS_TABLE).insert(payload).select("id").single();
   const { data, error } = await request;
   if (error) {
-    const message = `成绩同步失败：${error.message}`;
+    const message = "Score sync failed: " + error.message;
     setNetworkStatus(message);
     setLeaderboardStatus(message);
   }
@@ -611,9 +613,30 @@ async function syncGameSnapshot({ final = false } = {}) {
     if (data?.id) state.remoteResultId = data.id;
     state.dirty = false;
     saveGameProgress();
-    setLeaderboardStatus(`成绩已同步 ${syncTimeLabel()}，排行榜自动刷新中。`);
+    setLeaderboardStatus("Score synced " + syncTimeLabel() + "; leaderboard auto-refreshing.");
     if (!els.leaderboardPanel.classList.contains("hidden")) void loadLeaderboard(leaderboardMode, { silent: true });
   }
+}
+
+async function claimRemoteInventory() {
+  if (!supabaseClient || !profile.playerId) return false;
+  const { data, error } = await supabaseClient.rpc("claim_starlight_tool_grants", {
+    p_player_id: profile.playerId,
+  });
+  if (error) {
+    setNetworkStatus("Tool sync failed: " + error.message);
+    return false;
+  }
+  const grant = Array.isArray(data) ? data[0] : data;
+  const trashAdd = Number(grant?.trash_delta || 0);
+  const tongsAdd = Number(grant?.tongs_delta || 0);
+  if (trashAdd <= 0 && tongsAdd <= 0) return false;
+  state.trash += Math.max(0, trashAdd);
+  state.tongs += Math.max(0, tongsAdd);
+  markProgressChanged();
+  render();
+  setNetworkStatus("Remote tools received: trash +" + trashAdd + ", tongs +" + tongsAdd + ".");
+  return true;
 }
 
 async function submitGameResult() {
